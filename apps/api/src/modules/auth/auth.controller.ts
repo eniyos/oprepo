@@ -1,22 +1,28 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-  constructor() {}
+  constructor(private config: ConfigService) {}
+
+  @Get('status')
+  async status() {
+    return {
+      configured: !!this.config.get<string>('GITHUB_CLIENT_ID'),
+      provider: 'github',
+    };
+  }
 
   @Get('github')
   @UseGuards(AuthGuard('github'))
   async githubLogin() {
-    // Passport redirects to GitHub
+    // Passport handles the redirect to GitHub
   }
 
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
   async githubCallback(@Req() req: any) {
-    // On success, redirect to frontend with a session token
-    // In MVP, we return the developer profile directly
-    // Future: issue JWT or session cookie
     return {
       success: true,
       developer: {
