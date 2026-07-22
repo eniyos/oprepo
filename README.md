@@ -59,7 +59,22 @@ pnpm dev
 
 The API runs at `http://localhost:4000` and the web app at `http://localhost:3000`.
 
-### Ingest a Repository
+### Bulk Ingest (recommended)
+
+Populate the repository index with 50+ top open-source projects:
+
+```bash
+# Set your GitHub token for higher API limits (needed for bulk)
+export GITHUB_TOKEN=ghp_your_token_here
+
+# Ingest the first 50 repos
+pnpm ingest
+
+# Or specify a limit
+pnpm ingest -- --limit=20
+```
+
+### Single Repository Ingest
 
 ```bash
 curl -X POST http://localhost:4000/api/v1/github/ingest/repo \

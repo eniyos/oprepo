@@ -13,10 +13,12 @@
     "docker:down": "docker compose down",
     "db:migrate": "turbo run migrate --filter=@oprepo/api",
     "ml:dev": "cd services/ml && uvicorn app.main:app --reload --port 8000",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "ingest": "npx ts-node scripts/bulk-ingest.ts"
   },
   "devDependencies": {
     "prettier": "^3.3.0",
+    "ts-node": "^10.9.0",
     "turbo": "^2.1.0",
     "typescript": "^5.6.0"
   },

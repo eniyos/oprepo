@@ -9,6 +9,8 @@ dist/
 test/*.spec.js
 test/*.spec.d.ts
 test/*.spec.js.map
+scripts/*.js
+scripts/*.d.ts
 
 # ─── Environment ───────────────────────────────────────────
 .env
