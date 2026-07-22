@@ -49,18 +49,36 @@ export class RecommendationService {
     }
     if (!developer && input.githubUsername) {
       const profile = await this.githubService.fetchDeveloperProfile(input.githubUsername);
-      developer = await this.developerRepo.save(
-        this.developerRepo.create({
-          githubUsername: profile.githubUsername,
-          bio: profile.bio,
-          location: profile.location,
-          avatarUrl: profile.avatarUrl,
-          skills: profile.skills as any,
-          interests: profile.interests,
-          goals: profile.goals,
-          constraints: profile.constraints,
-        }),
-      );
+
+      // Check if developer already exists by username (upsert)
+      let existing = await this.developerRepo.findOneBy({
+        githubUsername: profile.githubUsername,
+      });
+
+      if (existing) {
+        // Update existing
+        existing.bio = profile.bio;
+        existing.location = profile.location;
+        existing.avatarUrl = profile.avatarUrl;
+        existing.skills = profile.skills as any;
+        existing.interests = profile.interests;
+        existing.goals = profile.goals;
+        existing.constraints = profile.constraints;
+        developer = await this.developerRepo.save(existing);
+      } else {
+        developer = await this.developerRepo.save(
+          this.developerRepo.create({
+            githubUsername: profile.githubUsername,
+            bio: profile.bio,
+            location: profile.location,
+            avatarUrl: profile.avatarUrl,
+            skills: profile.skills as any,
+            interests: profile.interests,
+            goals: profile.goals,
+            constraints: profile.constraints,
+          }),
+        );
+      }
     }
 
     if (!developer) {
@@ -219,7 +237,7 @@ export class RecommendationService {
     const query = this.repoRepo
       .createQueryBuilder('r')
       .where('r.stargazersCount > 10')
-      .andWhere('r.communityHealthScore > 0')
+      .andWhere('r.communityHealthScore >= 0')
       .orderBy('r.stargazersCount', 'DESC')
       .take(200);
 

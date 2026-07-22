@@ -12,25 +12,25 @@ export class Recommendation {
   id: string;
 
   @ManyToOne(() => Developer, (d) => d.recommendations, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'developerId' })
+  @JoinColumn()
   developer: Developer;
 
-  @Column({ name: 'developerId' })
+  @Column()
   @Index()
   developerId: string;
 
   @ManyToOne(() => Repository, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'repositoryId' })
+  @JoinColumn()
   repository?: Repository;
 
-  @Column({ name: 'repositoryId', nullable: true })
+  @Column({ nullable: true })
   repositoryId?: string;
 
   @ManyToOne(() => Issue, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'issueId' })
+  @JoinColumn()
   issue?: Issue;
 
-  @Column({ name: 'issueId', nullable: true })
+  @Column({ nullable: true })
   issueId?: string;
 
   @Column({ type: 'float' })

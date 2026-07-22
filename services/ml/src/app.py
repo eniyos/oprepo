@@ -3,6 +3,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import numpy as np
 from dotenv import load_dotenv
@@ -16,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("oprepo-ml")
 
 # Global model instance
-model: EmbeddingModel | None = None
+model: Optional[EmbeddingModel] = None
 
 
 @asynccontextmanager

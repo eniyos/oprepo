@@ -14,10 +14,10 @@ export class Issue {
   githubId: number;
 
   @ManyToOne(() => Repository, (r) => r.issues, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'repositoryId' })
+  @JoinColumn()
   repository: Repository;
 
-  @Column({ name: 'repositoryId' })
+  @Column()
   repositoryId: string;
 
   @Column({ type: 'text' })

@@ -7,6 +7,7 @@ import { GithubModule } from './modules/github/github.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { MlModule } from './modules/ml/ml.module';
 import { ApiConfig } from './config/api.config';
+import { SnakeNamingStrategy } from './config/snake-naming.strategy';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ApiConfig } from './config/api.config';
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: false, // use migrations in production
+        namingStrategy: new SnakeNamingStrategy(),
         extra: {
           poolSize: 20,
         },

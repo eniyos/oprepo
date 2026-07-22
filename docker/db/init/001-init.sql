@@ -1,7 +1,7 @@
 -- Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Core tables
+-- Core tables (snake_case columns match TypeORM snake_case naming strategy)
 CREATE TABLE developers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   github_username VARCHAR(255) UNIQUE NOT NULL,

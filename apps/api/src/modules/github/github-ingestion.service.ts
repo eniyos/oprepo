@@ -26,12 +26,15 @@ export class GithubIngestionService {
   }
 
   private get client() {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
     return axios.create({
       baseURL: this.apiBase,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
+      headers,
     });
   }
 

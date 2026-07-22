@@ -11,18 +11,18 @@ export class Feedback {
   id: string;
 
   @ManyToOne(() => Developer, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'developerId' })
+  @JoinColumn()
   developer: Developer;
 
-  @Column({ name: 'developerId' })
+  @Column()
   @Index()
   developerId: string;
 
   @ManyToOne(() => Recommendation, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'recommendationId' })
+  @JoinColumn()
   recommendation: Recommendation;
 
-  @Column({ name: 'recommendationId' })
+  @Column()
   @Index()
   recommendationId: string;
 
