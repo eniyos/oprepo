@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository as TypeOrmRepo } from 'typeorm';
+import { IsNull, LessThan, Repository as TypeOrmRepo } from 'typeorm';
 import { Repository } from '../../database/entities/repository.entity';
 
 @Injectable()
@@ -27,7 +27,7 @@ export class CronService {
       const stale = await this.repoRepo.find({
         where: [
           { lastIndexedAt: LessThan(sevenDaysAgo) },
-          { lastIndexedAt: null as any },
+          { lastIndexedAt: IsNull() },
         ],
         order: { stargazersCount: 'DESC' },
         take: 50,

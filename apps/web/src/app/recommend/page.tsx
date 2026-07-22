@@ -40,6 +40,9 @@ export default function RecommendPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${apiUrl}/api/v1/recommend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,13 +50,19 @@ export default function RecommendPage() {
           githubUsername: username.trim(),
           context: { focus, maxResults: 6 },
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`API error: ${res.statusText}`);
       const data: RecommendResponse = await res.json();
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get recommendations');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Request timed out. Is the API server running?');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to get recommendations');
+      }
     } finally {
       setLoading(false);
     }

@@ -44,12 +44,18 @@ export default function HistoryPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(
         `${apiUrl}/api/v1/recommend/history/${encodeURIComponent(developerId.trim())}?limit=20`,
+        { signal: controller.signal },
       );
+      clearTimeout(timeoutId);
 
       if (res.status === 404) {
         setError('No recommendations found for this developer.');
+        setData({ items: [] });
         return;
       }
       if (!res.ok) throw new Error(`API error: ${res.statusText}`);
@@ -57,7 +63,11 @@ export default function HistoryPage() {
       const items: HistoryItem[] = await res.json();
       setData({ items });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load history');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Request timed out. Is the API server running?');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load history');
+      }
     } finally {
       setLoading(false);
     }

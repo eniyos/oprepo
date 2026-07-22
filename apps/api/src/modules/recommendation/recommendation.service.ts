@@ -156,13 +156,13 @@ export class RecommendationService {
       const devEmbedding = await this.mlService.embedText(devText);
 
       // 2. Embed repos — prefer stored embeddings, fall back to on-the-fly
-      const repoEmbeddings: number[][] = [];
+      const repoEmbeddings: (number[] | null)[] = new Array(repos.length).fill(null);
       const needEmbed: { repo: any; index: number }[] = [];
 
       for (let i = 0; i < repos.length; i++) {
         const repo = repos[i];
         if (repo.embeddings?.length === 384) {
-          repoEmbeddings.push(repo.embeddings);
+          repoEmbeddings[i] = repo.embeddings;
         } else {
           needEmbed.push({ repo, index: i });
         }
@@ -173,14 +173,34 @@ export class RecommendationService {
         const texts = needEmbed.map(({ repo }) => this.mlService.buildRepoText(repo));
         const embeddings = await this.mlService.embedBatch(texts);
         for (let j = 0; j < needEmbed.length; j++) {
-          repoEmbeddings[needEmbed[j].index] = embeddings[j];
+          repoEmbeddings[needEmbed[j].index] = embeddings[j] ?? new Array(384).fill(0);
         }
       }
 
-      if (!repoEmbeddings.length) return [];
+      // Separate repos with and without embeddings
+      const withEmbed: { embedding: number[]; index: number }[] = [];
+      for (let i = 0; i < repoEmbeddings.length; i++) {
+        const emb = repoEmbeddings[i];
+        if (emb) {
+          withEmbed.push({ embedding: emb, index: i });
+        }
+      }
 
-      // 3. Compute similarities
-      return await this.mlService.computeSimilarities(devEmbedding, repoEmbeddings);
+      if (!withEmbed.length) return [];
+
+      // Compute similarities for repos that have embeddings
+      const batchScores = await this.mlService.computeSimilarities(
+        devEmbedding,
+        withEmbed.map((w) => w.embedding),
+      );
+
+      // Reconstruct full-length scores array (-1 for repos without embeddings)
+      const scores: number[] = new Array(repos.length).fill(-1);
+      for (let k = 0; k < withEmbed.length; k++) {
+        scores[withEmbed[k].index] = batchScores[k];
+      }
+
+      return scores;
     } catch (e) {
       this.logger.warn('computeMlSimilarities failed, rule-based fallback', e);
       return [];

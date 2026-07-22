@@ -19,26 +19,39 @@ export default function IngestPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       // Ingest repo
       const repoRes = await fetch(`${apiUrl}/api/v1/github/ingest/repo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoFullName: repoName.trim() }),
+        signal: controller.signal,
       });
       if (!repoRes.ok) throw new Error(`Ingestion failed: ${repoRes.statusText}`);
 
-      // Also ingest issues
-      await fetch(`${apiUrl}/api/v1/github/ingest/issues`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoFullName: repoName.trim() }),
-      });
+      // Also ingest issues (best-effort)
+      try {
+        await fetch(`${apiUrl}/api/v1/github/ingest/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoFullName: repoName.trim() }),
+          signal: controller.signal,
+        });
+      } catch {
+        // issues ingestion is non-critical
+      }
 
-      setSuccess(`Successfully ingested ${repoName} with issues.`);
+      clearTimeout(timeoutId);
+      setSuccess(`Successfully ingested ${repoName}.`);
       setRepoName('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to ingest repository');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Request timed out. Is the API server running?');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to ingest repository');
+      }
     } finally {
       setLoading(false);
     }
