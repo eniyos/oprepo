@@ -1,7 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 
 export interface ScoredResult {
   repoId?: string;
@@ -24,11 +21,6 @@ export interface ScoredResult {
 @Injectable()
 export class MatchingEngine {
   private readonly logger = new Logger(MatchingEngine.name);
-
-  constructor(
-    private config: ConfigService,
-    private httpService: HttpService,
-  ) {}
 
   score(
     developer: any,
