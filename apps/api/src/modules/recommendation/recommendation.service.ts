@@ -8,6 +8,7 @@ import { Recommendation } from '../../database/entities/recommendation.entity';
 import { Feedback } from '../../database/entities/feedback.entity';
 import { MatchingEngine } from './matching-engine.service';
 import { GithubService } from '../github/github.service';
+import { MlService } from '../ml/ml.service';
 
 @Injectable()
 export class RecommendationService {
@@ -26,6 +27,7 @@ export class RecommendationService {
     private feedbackRepo: TypeOrmRepo<Feedback>,
     private matchingEngine: MatchingEngine,
     private githubService: GithubService,
+    private mlService: MlService,
   ) {}
 
   async recommend(input: {
@@ -46,7 +48,6 @@ export class RecommendationService {
       developer = await this.developerRepo.findOneBy({ id: input.developerId });
     }
     if (!developer && input.githubUsername) {
-      // Try to fetch from GitHub
       const profile = await this.githubService.fetchDeveloperProfile(input.githubUsername);
       developer = await this.developerRepo.save(
         this.developerRepo.create({
@@ -72,17 +73,33 @@ export class RecommendationService {
     // 2. Build developer summary
     const devSummary = this.buildSummary(developer);
 
-    // 3. Find candidates and score
+    // 3. Find candidates
     const candidates = focus === 'issues'
       ? await this.findIssueCandidates(developer)
       : await this.findRepoCandidates(developer);
 
-    const scored = this.matchingEngine.score(developer, candidates, focus);
+    if (candidates.length === 0) {
+      return {
+        developerSummary: devSummary,
+        recommendations: [],
+      };
+    }
 
-    // 4. Format top results
+    // 4. Score — try hybrid (ML + rules), fall back to pure rules
+    let scored = await this.matchingEngine.scoreHybrid(
+      developer, candidates, focus,
+      async (dev, repos) => this.computeMlSimilarities(dev, repos),
+    );
+
+    // If hybrid produced all zeros (ML down), fall back
+    if (!scored.length || scored.every((s) => s.score === 0)) {
+      scored = this.matchingEngine.score(developer, candidates, focus);
+    }
+
+    // 5. Format top results
     const topResults = scored.slice(0, maxResults);
 
-    // 5. Persist recommendations
+    // 6. Persist recommendations
     const recommendations = topResults.map((result) =>
       this.recRepo.create({
         developerId: developer!.id,
@@ -107,6 +124,51 @@ export class RecommendationService {
     };
   }
 
+  /**
+   * Build developer embedding, embed repo texts, then compute cosine similarities.
+   * Returns a scores array parallel to `repos` or empty array on failure.
+   */
+  private async computeMlSimilarities(developer: any, repos: any[]): Promise<number[]> {
+    if (!repos.length) return [];
+
+    try {
+      // 1. Embed developer
+      const devText = this.mlService.buildDeveloperText(developer);
+      if (!devText) return [];
+      const devEmbedding = await this.mlService.embedText(devText);
+
+      // 2. Embed repos — prefer stored embeddings, fall back to on-the-fly
+      const repoEmbeddings: number[][] = [];
+      const needEmbed: { repo: any; index: number }[] = [];
+
+      for (let i = 0; i < repos.length; i++) {
+        const repo = repos[i];
+        if (repo.embeddings?.length === 384) {
+          repoEmbeddings.push(repo.embeddings);
+        } else {
+          needEmbed.push({ repo, index: i });
+        }
+      }
+
+      // Embed any repos that don't have stored vectors
+      if (needEmbed.length > 0) {
+        const texts = needEmbed.map(({ repo }) => this.mlService.buildRepoText(repo));
+        const embeddings = await this.mlService.embedBatch(texts);
+        for (let j = 0; j < needEmbed.length; j++) {
+          repoEmbeddings[needEmbed[j].index] = embeddings[j];
+        }
+      }
+
+      if (!repoEmbeddings.length) return [];
+
+      // 3. Compute similarities
+      return await this.mlService.computeSimilarities(devEmbedding, repoEmbeddings);
+    } catch (e) {
+      this.logger.warn('computeMlSimilarities failed, rule-based fallback', e);
+      return [];
+    }
+  }
+
   async recordFeedback(input: {
     recommendationId: string;
     rating?: number;
@@ -129,7 +191,6 @@ export class RecommendationService {
       comments: input.comments,
     });
 
-    // Update recommendation feedback status
     if (input.rating && input.rating >= 4) {
       await this.recRepo.update(rec.id, { feedback: 'positive' });
     } else if (input.rating && input.rating <= 2) {
@@ -149,7 +210,6 @@ export class RecommendationService {
   }
 
   private async findRepoCandidates(developer: Developer) {
-    // Get repos not already recommended to this developer
     const recommendedIds = await this.recRepo.find({
       where: { developerId: developer.id, type: 'repo' },
       select: ['repositoryId'],

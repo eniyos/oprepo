@@ -101,4 +101,141 @@ describe('MatchingEngine', () => {
     expect(results.length).toBe(1);
     expect(results[0].score).toBeGreaterThanOrEqual(0);
   });
+
+  describe('scoreHybrid', () => {
+    it('should blend ML scores with rule-based scores', async () => {
+      const developer = {
+        skills: { languages: ['TypeScript'], domains: ['web'] },
+        interests: ['react'],
+        goals: [],
+        constraints: [],
+      };
+
+      const candidates = [
+        {
+          fullName: 'org/ts-repo',
+          topics: ['typescript'],
+          secondaryLanguages: ['TypeScript'],
+          domainTags: ['web'],
+          stargazersCount: 5000,
+          communityHealthScore: 0.8,
+          hasContributingGuide: true,
+        },
+        {
+          fullName: 'org/other-repo',
+          topics: ['ruby'],
+          secondaryLanguages: ['Ruby'],
+          domainTags: ['backend'],
+          stargazersCount: 100,
+          communityHealthScore: 0.3,
+          hasContributingGuide: false,
+        },
+      ];
+
+      const results = await engine.scoreHybrid(
+        developer,
+        candidates,
+        'repos',
+        async () => [0.9, 0.2], // ML similarity scores
+      );
+
+      expect(results.length).toBe(2);
+      // With mlScore=0.9 and rule score near 1, blended should be high
+      expect(results[0].score).toBeGreaterThan(results[1].score);
+      // ML similarity reason should be present
+      expect(results[0].reasons[0]).toContain('semantic');
+    });
+
+    it('should add a ML similarity reason when mlScore is high', async () => {
+      const developer = {
+        skills: { languages: ['Python'], domains: ['ML/AI'] },
+        interests: ['machine-learning'],
+        goals: [],
+        constraints: [],
+      };
+
+      const candidates = [
+        {
+          fullName: 'org/ml-project',
+          topics: ['machine-learning', 'python'],
+          secondaryLanguages: ['Python'],
+          domainTags: ['ML/AI'],
+          stargazersCount: 1000,
+          communityHealthScore: 0.6,
+          hasContributingGuide: true,
+        },
+      ];
+
+      const results = await engine.scoreHybrid(
+        developer,
+        candidates,
+        'repos',
+        async () => [0.95],
+      );
+
+      expect(results[0].reasons[0]).toContain('Strong semantic');
+    });
+
+    it('should fall through with empty ML similarity gracefully', async () => {
+      const developer = {
+        skills: { languages: ['Go'], domains: ['infra'] },
+        interests: [],
+        goals: [],
+        constraints: [],
+      };
+
+      const candidates = [
+        {
+          fullName: 'org/go-tool',
+          topics: ['go', 'cli'],
+          secondaryLanguages: ['Go'],
+          domainTags: ['devtools'],
+          stargazersCount: 500,
+          communityHealthScore: 0.5,
+          hasContributingGuide: false,
+        },
+      ];
+
+      const results = await engine.scoreHybrid(
+        developer,
+        candidates,
+        'repos',
+        async () => [] as number[], // Empty ML scores
+      );
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should fall through when similarityFn throws', async () => {
+      const developer = {
+        skills: { languages: ['Java'], domains: ['backend'] },
+        interests: [],
+        goals: [],
+        constraints: [],
+      };
+
+      const candidates = [
+        {
+          fullName: 'org/java-app',
+          topics: ['java'],
+          secondaryLanguages: ['Java'],
+          domainTags: ['backend'],
+          stargazersCount: 300,
+          communityHealthScore: 0.7,
+          hasContributingGuide: true,
+        },
+      ];
+
+      const results = await engine.scoreHybrid(
+        developer,
+        candidates,
+        'repos',
+        async () => { throw new Error('ML down'); },
+      );
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThanOrEqual(0);
+    });
+  });
 });

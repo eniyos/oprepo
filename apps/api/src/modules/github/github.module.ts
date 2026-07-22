@@ -6,9 +6,13 @@ import { Issue } from '../../database/entities/issue.entity';
 import { GithubController } from './github.controller';
 import { GithubService } from './github.service';
 import { GithubIngestionService } from './github-ingestion.service';
+import { MlModule } from '../ml/ml.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Developer, Repository, Issue])],
+  imports: [
+    TypeOrmModule.forFeature([Developer, Repository, Issue]),
+    MlModule,
+  ],
   controllers: [GithubController],
   providers: [GithubService, GithubIngestionService],
   exports: [GithubService],

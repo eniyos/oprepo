@@ -18,10 +18,15 @@ export interface ScoredResult {
   suggestedNextSteps: string[];
 }
 
+export type SimilarityFn = (dev: any, repos: any[]) => Promise<number[]>;
+
 @Injectable()
 export class MatchingEngine {
   private readonly logger = new Logger(MatchingEngine.name);
 
+  /**
+   * Pure rule-based scoring — fast, works without ML infra.
+   */
   score(
     developer: any,
     candidates: any[],
@@ -35,6 +40,74 @@ export class MatchingEngine {
     return candidates
       .map((candidate) => this.scoreCandidate(candidate, developer, devLanguages, devDomains, devInterests, focus))
       .sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Hybrid scoring — blends rule-based signals with ML vector similarity.
+   * Falls back to pure rule-based if similarityFn throws or returns empty.
+   */
+  async scoreHybrid(
+    developer: any,
+    candidates: any[],
+    focus: 'repos' | 'issues',
+    similarityFn: SimilarityFn,
+  ): Promise<ScoredResult[]> {
+    const skills = developer.skills || {};
+    const devLanguages = new Set<string>((skills.languages || []).map((l: string) => l.toLowerCase()));
+    const devDomains = new Set<string>((skills.domains || []).map((d: string) => d.toLowerCase()));
+    const devInterests = new Set<string>((developer.interests || []).map((i: string) => i.toLowerCase()));
+
+    // Compute ML similarity scores
+    let mlScores: number[] | null = null;
+    try {
+      mlScores = await similarityFn(developer, candidates);
+    } catch (e) {
+      this.logger.warn('ML similarity failed, falling back to rule-based', e);
+    }
+
+    const mlScoreMap = mlScores?.length === candidates.length
+      ? new Map(candidates.map((c, i) => [this.candidateKey(c, focus), mlScores[i]]))
+      : null;
+
+    const scored = candidates.map((candidate) =>
+      this.scoreCandidateHybrid(
+        candidate, developer, devLanguages, devDomains, devInterests, focus,
+        mlScoreMap?.get(this.candidateKey(candidate, focus)),
+      ),
+    );
+
+    return scored.sort((a, b) => b.score - a.score);
+  }
+
+  private candidateKey(candidate: any, focus: string): string {
+    if (focus === 'issues') return candidate.id || candidate.githubId;
+    return candidate.fullName || candidate.id;
+  }
+
+  private scoreCandidateHybrid(
+    candidate: any,
+    developer: any,
+    devLanguages: Set<string>,
+    devDomains: Set<string>,
+    devInterests: Set<string>,
+    focus: 'repos' | 'issues',
+    mlScore: number | undefined,
+  ): ScoredResult {
+    const ruleResult = this.scoreCandidate(candidate, developer, devLanguages, devDomains, devInterests, focus);
+
+    if (mlScore !== undefined && mlScore >= 0) {
+      // Blend: 40% rule-based + 60% ML similarity
+      const blended = ruleResult.score * 0.4 + mlScore * 0.6;
+      ruleResult.score = Math.max(0, Math.min(1, blended));
+
+      if (mlScore > 0.7) {
+        ruleResult.reasons.unshift('Strong semantic similarity to your profile and past projects.');
+      } else if (mlScore > 0.5) {
+        ruleResult.reasons.unshift('Good semantic match with your demonstrated skills and interests.');
+      }
+    }
+
+    return ruleResult;
   }
 
   private scoreCandidate(
@@ -155,13 +228,11 @@ export class MatchingEngine {
     const devLevel = developer.skills?.experienceLevel || 'beginner';
     const candDifficulty = this.inferDifficulty(candidate, isIssue);
 
-    const levelRank = { beginner: 0, intermediate: 1, advanced: 2 };
-    const devRank = levelRank[devLevel as keyof typeof levelRank] ?? 0;
-    const candRank = levelRank[candDifficulty as keyof typeof levelRank] ?? 0;
+    const levelRank: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+    const devRank = levelRank[devLevel] ?? 0;
+    const candRank = levelRank[candDifficulty] ?? 0;
 
-    // Penalize if candidate is too hard relative to developer
     if (candRank > devRank + 1) return 0.15;
-    // Bonus if candidate is a good stretch (one level above)
     if (candRank === devRank + 1) return -0.05;
     return 0;
   }
@@ -176,7 +247,6 @@ export class MatchingEngine {
       return 'intermediate';
     }
 
-    // Repo difficulty inferred from size/activity
     if (candidate.difficultyLabel) return candidate.difficultyLabel;
     const stars = candidate.stargazersCount || 0;
     const contribs = candidate.activeContributorCount || 0;

@@ -8,10 +8,12 @@ import { Feedback } from '../../database/entities/feedback.entity';
 import { RecommendationController } from './recommendation.controller';
 import { RecommendationService } from './recommendation.service';
 import { MatchingEngine } from './matching-engine.service';
+import { MlModule } from '../ml/ml.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Developer, Repository, Issue, Recommendation, Feedback]),
+    MlModule,
   ],
   controllers: [RecommendationController],
   providers: [RecommendationService, MatchingEngine],

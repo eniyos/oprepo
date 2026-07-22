@@ -5,6 +5,7 @@ import { Repository as TypeOrmRepo } from 'typeorm';
 import axios from 'axios';
 import { Repository } from '../../database/entities/repository.entity';
 import { Issue } from '../../database/entities/issue.entity';
+import { MlService } from '../ml/ml.service';
 
 @Injectable()
 export class GithubIngestionService {
@@ -18,6 +19,7 @@ export class GithubIngestionService {
     private repoRepo: TypeOrmRepo<Repository>,
     @InjectRepository(Issue)
     private issueRepo: TypeOrmRepo<Issue>,
+    private mlService: MlService,
   ) {
     this.apiBase = this.config.get('api.github.apiBase')!;
     this.token = this.config.get('api.github.token')!;
@@ -55,6 +57,9 @@ export class GithubIngestionService {
 
       await this.repoRepo.save(repo);
 
+      // Generate embedding for the repo
+      await this.generateRepoEmbedding(repo);
+
       // Fetch additional metadata (contributing guide, community health)
       await this.enrichRepository(repo, fullName);
 
@@ -66,9 +71,23 @@ export class GithubIngestionService {
     }
   }
 
+  /**
+   * Generate and persist vector embedding for a repository.
+   */
+  private async generateRepoEmbedding(repo: Repository) {
+    try {
+      const text = this.mlService.buildRepoText(repo);
+      if (!text) return;
+      const embedding = await this.mlService.embedText(text);
+      await this.repoRepo.update(repo.id, { embeddings: embedding as any });
+      this.logger.debug(`Generated embedding for ${repo.fullName}`);
+    } catch (e) {
+      this.logger.warn(`Failed to generate embedding for ${repo.fullName}, skipping`, e);
+    }
+  }
+
   private async enrichRepository(repo: Repository, fullName: string) {
     try {
-      // Check for CONTRIBUTING.md
       const { data: contents } = await this.client.get(`/repos/${fullName}/contents`, {
         params: { ref: 'HEAD' },
       });
@@ -97,7 +116,7 @@ export class GithubIngestionService {
       const { data: issues } = await this.client.get(`/repos/${fullName}/issues`, { params });
 
       const entities = issues
-        .filter((i: any) => !i.pull_request) // exclude PRs
+        .filter((i: any) => !i.pull_request)
         .map((i: any) =>
           this.issueRepo.create({
             githubId: i.id,
