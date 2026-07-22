@@ -51,7 +51,7 @@ export class RecommendationService {
       const profile = await this.githubService.fetchDeveloperProfile(input.githubUsername);
 
       // Check if developer already exists by username (upsert)
-      let existing = await this.developerRepo.findOneBy({
+      const existing = await this.developerRepo.findOneBy({
         githubUsername: profile.githubUsername,
       });
 

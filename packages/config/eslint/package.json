@@ -2,5 +2,8 @@
   "name": "@oprepo/eslint-config",
   "version": "0.1.0",
   "private": true,
-  "main": "base.js"
+  "main": "base.js",
+  "dependencies": {
+    "eslint-config-prettier": "^9.1.0"
+  }
 }
