@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 /**
- * Bulk ingest script — populates the repo index with top GitHub repos.
+ * Bulk ingest script — populates the repo index via the async ingestion queue.
  *
  * Usage:
- *   export GITHUB_TOKEN=ghp_...
- *   npx ts-node scripts/bulk-ingest.ts [--limit 50] [--min-stars 1000]
+ *   export GITHUB_TOKEN=ghp_...        # optional but recommended
+ *   npx ts-node scripts/bulk-ingest.ts [--limit 50]
+ *
+ * All repos are sent to the queue in one batch. The API processes them
+ * in the background with rate-limit-aware concurrency (max 3 at a time,
+ * max 30 requests per 60 seconds). Check the API logs for progress.
  */
 
 const TOP_REPOS = [
-  // Frontend frameworks
+  // Frontend
   'facebook/react', 'vuejs/core', 'sveltejs/svelte', 'angular/angular',
   'vercel/next.js', 'nuxt/nuxt', 'remix-run/remix',
 
@@ -48,73 +52,38 @@ const TOP_REPOS = [
   'microsoft/playwright', 'cypress-io/cypress', 'vitest-dev/vitest',
   'jestjs/jest',
 
-  // Fun / wildcard
+  // Fun
   'curl/curl', 'git/git', 'tmux/tmux', 'yt-dlp/yt-dlp',
 ];
 
 async function main() {
-  const limit = parseInt(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] || '50', 10);
+  const limit = parseInt(
+    process.argv.find((a) => a.startsWith('--limit='))?.split('=')[1] || '50',
+    10,
+  );
   const repos = TOP_REPOS.slice(0, limit);
-
   const apiUrl = process.env.API_URL || 'http://localhost:4000';
-  const token = process.env.GITHUB_TOKEN;
 
-  if (!token) {
-    console.warn('⚠️  No GITHUB_TOKEN set. GitHub allows only 60 req/hr unauthenticated.');
-    console.warn('   Set GITHUB_TOKEN for higher limits: export GITHUB_TOKEN=ghp_...');
-    console.warn('');
+  console.log(`🍽️  Queuing ${repos.length} repos for ingestion via ${apiUrl}...\n`);
+
+  // Send all repos as a single bulk job
+  const res = await fetch(`${apiUrl}/api/v1/github/ingest/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repos }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`❌ Failed to queue bulk job: ${res.status} ${text}`);
+    process.exit(1);
   }
 
-  console.log(`🍽️  Bulk-ingesting ${repos.length} repos into ${apiUrl}...\n`);
-
-  let success = 0;
-  let failed = 0;
-
-  for (let i = 0; i < repos.length; i++) {
-    const repo = repos[i];
-    const progress = `[${i + 1}/${repos.length}]`;
-
-    // Rate limit: sleep 1s between requests for unauthenticated, 200ms for authed
-    if (i > 0) {
-      await new Promise(r => setTimeout(r, token ? 200 : 1000));
-    }
-
-    process.stdout.write(`${progress} ${repo}... `);
-
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/github/ingest/repo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoFullName: repo }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.log(`❌ ${res.status} ${text.slice(0, 60)}`);
-        failed++;
-        continue;
-      }
-
-      await res.json();
-      console.log(`✅`);
-
-      // Also ingest issues (best-effort)
-      try {
-        await fetch(`${apiUrl}/api/v1/github/ingest/issues`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repoFullName: repo }),
-        });
-      } catch {}
-
-      success++;
-    } catch (err: any) {
-      console.log(`❌ ${err.message.slice(0, 60)}`);
-      failed++;
-    }
-  }
-
-  console.log(`\n📊 Done: ${success} succeeded, ${failed} failed`);
+  const result = await res.json();
+  console.log(`✅ Queued ${result.count} repos (bulk job submitted)\n`);
+  console.log('The worker processes them in the background with rate-limit awareness.');
+  console.log('Monitor progress via:');
+  console.log('  tail -f /tmp/api-service.log');
 }
 
 main().catch(console.error);

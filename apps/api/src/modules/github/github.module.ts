@@ -5,16 +5,15 @@ import { Repository } from '../../database/entities/repository.entity';
 import { Issue } from '../../database/entities/issue.entity';
 import { GithubController } from './github.controller';
 import { GithubService } from './github.service';
-import { GithubIngestionService } from './github-ingestion.service';
-import { MlModule } from '../ml/ml.module';
+import { IngestionModule } from '../ingestion/ingestion.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Developer, Repository, Issue]),
-    MlModule,
+    IngestionModule,
   ],
   controllers: [GithubController],
-  providers: [GithubService, GithubIngestionService],
+  providers: [GithubService],
   exports: [GithubService],
 })
 export class GithubModule {}

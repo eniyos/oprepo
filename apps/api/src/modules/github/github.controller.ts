@@ -1,12 +1,12 @@
 import { Controller, Get, Post, Body, Param, ParseUUIDPipe } from '@nestjs/common';
 import { GithubService } from './github.service';
-import { GithubIngestionService } from './github-ingestion.service';
+import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
 
 @Controller('github')
 export class GithubController {
   constructor(
     private readonly githubService: GithubService,
-    private readonly ingestionService: GithubIngestionService,
+    private readonly queue: IngestionQueueService,
   ) {}
 
   @Get('profile/:username')
@@ -16,12 +16,17 @@ export class GithubController {
 
   @Post('ingest/repo')
   async ingestRepo(@Body() body: { repoFullName: string }) {
-    return this.ingestionService.ingestRepository(body.repoFullName);
+    return this.queue.queueRepoIngestion(body.repoFullName);
   }
 
   @Post('ingest/issues')
   async ingestIssues(@Body() body: { repoFullName: string; labels?: string[] }) {
-    return this.ingestionService.ingestIssues(body.repoFullName, body.labels);
+    return this.queue.queueIssuesIngestion(body.repoFullName, body.labels);
+  }
+
+  @Post('ingest/bulk')
+  async ingestBulk(@Body() body: { repos: string[] }) {
+    return this.queue.queueBulkIngestion(body.repos);
   }
 
   @Get('developers/:id')

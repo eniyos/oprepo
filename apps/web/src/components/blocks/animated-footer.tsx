@@ -2,384 +2,244 @@
 
 import Link from "next/link";
 import { FaGithub, FaXTwitter } from "react-icons/fa6";
-import { cn } from "@/lib/utils";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import React, { useMemo, useRef, useState, MouseEvent, useCallback, useEffect } from "react";
-import * as THREE from "three";
-import { motion } from "framer-motion";
+import { ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-interface DotMatrixProps {
-  colors?: number[][];
-  opacities?: number[];
-  totalSize?: number;
-  dotSize?: number;
-  shader?: string;
-  center?: ("x" | "y")[];
-}
+const SITE_LINKS = [
+  {
+    title: "Product",
+    links: [
+      { id: 1, label: "Discover", href: "/" },
+      { id: 2, label: "Recommend", href: "/recommend" },
+      { id: 3, label: "History", href: "/history" },
+      { id: 4, label: "Add Repo", href: "/ingest" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { id: 5, label: "GitHub", href: "https://github.com/eniyos/oprepo" },
+      { id: 6, label: "About", href: "/" },
+      { id: 7, label: "Blog", href: "#" },
+      { id: 8, label: "Contact", href: "#" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { id: 9, label: "Documentation", href: "#" },
+      { id: 10, label: "API Status", href: "#" },
+      { id: 11, label: "Newsletter", href: "#" },
+      { id: 12, label: "Privacy", href: "#" },
+    ],
+  },
+];
 
-interface ShaderProps {
-  source: string;
-  uniforms: Record<string, { value: number[] | number[][] | number; type: string }>;
-  maxFps?: number;
-}
-
-interface FooterLink { label: string; href: string }
-interface SocialLink { href: string; icon: React.ReactNode; ariaLabel: string }
-
-interface FooterProps {
-  heading?: { line1?: string; line2?: string; line3?: string };
-  socialLinks?: SocialLink[];
-  links?: FooterLink[];
-  companyDescription?: string;
-  copyright?: { companyName?: string; year?: number; additionalText?: string };
-}
-
-type Uniforms = Record<string, { value: number[] | number[][] | number; type: string }>;
-
-/* ─── Dot Matrix Shader ─── */
-const DotMatrix: React.FC<DotMatrixProps> = ({
-  colors = [[0, 0, 0]], opacities = [0.04, 0.04, 0.04, 0.04, 0.04, 0.08, 0.08, 0.08, 0.08, 0.14],
-  totalSize = 4, dotSize = 2, shader = "", center = ["x", "y"],
-}) => {
-  const preparedUniforms = useMemo(() => {
-    const base = [colors[0], colors[0], colors[0], colors[0], colors[0], colors[0]];
-    const arr = colors.length === 2
-      ? [colors[0], colors[0], colors[0], colors[1], colors[1], colors[1]]
-      : colors.length === 3
-        ? [colors[0], colors[0], colors[1], colors[1], colors[2], colors[2]]
-        : base;
-    return {
-      u_colors: { value: arr.map((c) => [c[0] / 255, c[1] / 255, c[2] / 255]), type: "uniform3fv" },
-      u_opacities: { value: opacities, type: "uniform1fv" },
-      u_total_size: { value: totalSize, type: "uniform1f" },
-      u_dot_size: { value: dotSize, type: "uniform1f" },
-    };
-  }, [colors, opacities, totalSize, dotSize]);
-
-  return (
-    <Shader source={`
-      precision mediump float; in vec2 fragCoord;
-      uniform float u_time; uniform float u_opacities[10]; uniform vec3 u_colors[6];
-      uniform float u_total_size; uniform float u_dot_size; uniform vec2 u_resolution; out vec4 fragColor;
-      float PHI = 1.61803398874989484820459;
-      float random(vec2 xy) { return fract(tan(distance(xy * PHI, xy) * 0.5) * xy.x); }
-      void main() {
-        vec2 st = fragCoord.xy;
-        ${center.includes("x") ? "st.x -= abs(floor((mod(u_resolution.x, u_total_size) - u_dot_size) * 0.5));" : ""}
-        ${center.includes("y") ? "st.y -= abs(floor((mod(u_resolution.y, u_total_size) - u_dot_size) * 0.5));" : ""}
-        float opacity = step(0.0, st.x) * step(0.0, st.y);
-        vec2 st2 = vec2(int(st.x / u_total_size), int(st.y / u_total_size));
-        float show_offset = random(st2);
-        float rand = random(st2 * floor((u_time / 5.0) + show_offset + 5.0) + 1.0);
-        opacity *= u_opacities[int(rand * 10.0)];
-        opacity *= 1.0 - step(u_dot_size / u_total_size, fract(st.x / u_total_size));
-        opacity *= 1.0 - step(u_dot_size / u_total_size, fract(st.y / u_total_size));
-        vec3 color = u_colors[int(show_offset * 6.0)];
-        ${shader}
-        fragColor = vec4(color, opacity); fragColor.rgb *= fragColor.a;
-      }`} uniforms={preparedUniforms} maxFps={60} />
-  );
-};
-
-/* ─── Shiny Text (shimmer on hover) ─── */
-const ShinyText = ({ text, children, isShining = false, speed = 1, className = '' }: {
-  text?: string; children?: React.ReactNode; isShining?: boolean; speed?: number; className?: string;
-}) => (
-  <span className={cn("inline-block bg-clip-text text-inherit transition-opacity", className)}
-    style={{
-      backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 60%)',
-      backgroundSize: '200% 100%', WebkitBackgroundClip: 'text',
-      backgroundPosition: isShining ? '-100%' : '110%',
-      transition: isShining ? `background-position ${speed}s linear` : 'none',
-    }}>
-    {children || text}
-  </span>
-);
-
-/* ─── Decrypt Text (scramble effect on hover) ─── */
-const DecryptText = ({ text, isDecrypting = false, duration = 0.1 }: {
-  text: string; isDecrypting?: boolean; duration?: number;
-}) => {
-  const [displayText, setDisplayText] = useState(text);
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?/";
-
-  useEffect(() => {
-    if (!isDecrypting) { setDisplayText(text); return; }
-    let iteration = 0;
-    const interval = setInterval(() => {
-      setDisplayText(prev => prev.split("").map((c, i) => {
-        if (c === " ") return " ";
-        if (i < iteration) return text[i];
-        return chars[Math.floor(Math.random() * chars.length)];
-      }).join(""));
-      iteration += 1 / 3;
-      if (iteration >= text.length) { clearInterval(interval); setDisplayText(text); }
-    }, duration * 1000 / text.length);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDecrypting, text, duration]);
-
-  return <>{displayText}</>;
-};
-
-/* ─── Animated Nav Link ─── */
-const AnimatedLink = ({ href, children, className }: {
-  href: string; children: React.ReactNode; className?: string;
-}) => {
-  const [hovered, setHovered] = useState(false);
-  const text = typeof children === 'string' ? children : '';
-  return (
-    <motion.div className="relative overflow-hidden" whileHover="hover" initial="initial"
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <motion.div className="absolute inset-0 bg-white/[0.06] z-0" variants={{ initial: { x: "-100%" }, hover: { x: 0 } }} transition={{ duration: 0.3 }} />
-      <Link href={href} className={cn("z-10 relative h-full flex items-center justify-center", className)}>
-        {typeof children === 'string' ? (
-          <ShinyText isShining={hovered} speed={0.8}>
-            <DecryptText text={text} isDecrypting={hovered} />
-          </ShinyText>
-        ) : children}
-      </Link>
-    </motion.div>
-  );
-};
-
-/* ─── Animated Icon Link ─── */
-const AnimatedIconLink = ({ href, icon, ariaLabel, className }: {
-  href: string; icon: React.ReactNode; ariaLabel: string; className?: string;
-}) => {
-  const [, setHovered] = useState(false);
-  return (
-    <motion.div className={cn("relative overflow-hidden", className)} whileHover="hover" initial="initial"
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <motion.div className="absolute inset-0 bg-white/[0.08] z-0" variants={{ initial: { x: "-100%" }, hover: { x: 0 } }} transition={{ duration: 0.3 }} />
-      <Link href={href} aria-label={ariaLabel} className="text-muted-foreground hover:text-foreground transition-colors z-10 relative flex items-center justify-center w-full h-full">
-        {icon}
-      </Link>
-    </motion.div>
-  );
-};
-
-/* ─── Canvas Reveal Effect (the animated dot matrix) ─── */
-const CanvasRevealEffect = ({
-  animationSpeed = 5, opacities = [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1],
-  colors = [[59, 130, 246]], containerClassName, dotSize, showGradient = true,
+/* ─── Flickering Grid ─── */
+function FlickeringGrid({
+  text = "",
+  className,
 }: {
-  animationSpeed?: number; opacities?: number[]; colors?: number[][]; containerClassName?: string;
-  dotSize?: number; showGradient?: boolean;
-}) => {
-  const [mousePos, setMousePos] = useState<[number, number]>([0.5, 0.5]);
-  const [lastMouse, setLastMouse] = useState<[number, number]>([0.5, 0.5]);
-  const [hovering, setHovering] = useState(false);
-  const [intensity, setIntensity] = useState(0);
+  text?: string;
+  className?: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
+  const [tablet, setTablet] = useState(false);
 
   useEffect(() => {
-    let id: number;
-    const start = intensity;
-    const target = hovering ? 1 : 0;
-    const dur = 0.5;
-    const t0 = performance.now();
-    const step = () => {
-      const p = Math.min((performance.now() - t0) / 1000 / dur, 1);
-      setIntensity(start + (target - start) * p);
-      if (p < 1) id = requestAnimationFrame(step);
+    const check = () => setTablet(window.innerWidth <= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const squareSize = 2;
+    const gridGap = tablet ? 2 : 3;
+    const maxOpacity = 0.3;
+    const flickerChance = 0.1;
+    const displayText = tablet ? "Footer" : text;
+
+    let animationId: number;
+    let squares: Float32Array;
+    let cols: number;
+    let rows: number;
+    let dpr: number;
+
+    const setup = () => {
+      dpr = window.devicePixelRatio || 1;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      cols = Math.ceil(w / (squareSize + gridGap));
+      rows = Math.ceil(h / (squareSize + gridGap));
+      squares = new Float32Array(cols * rows);
+      for (let i = 0; i < squares.length; i++) {
+        squares[i] = Math.random() * maxOpacity;
+      }
     };
-    id = requestAnimationFrame(step);
-    return () => { if (id) cancelAnimationFrame(id); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hovering]);
 
-  const handleMouse = useCallback((e: MouseEvent) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    setMousePos([x, y]);
-    if (!hovering) setLastMouse([x, y]);
-  }, [hovering]);
+    setup();
 
-  const pos = hovering ? mousePos : lastMouse;
+    const draw = () => {
+      ctx!.clearRect(0, 0, canvas.width, canvas.height);
 
-  return (
-    <div className={cn("h-full relative w-full bg-transparent", containerClassName)}
-      onMouseMove={handleMouse} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-      <div className="h-full w-full">
-        <DotMatrix colors={colors} dotSize={dotSize ?? 3} opacities={opacities}
-          shader={`
-            float anim = ${animationSpeed.toFixed(1)};
-            float off = distance(u_resolution / 2.0 / u_total_size, st2) * 0.01 + (random(st2) * 0.15);
-            opacity *= step(off, u_time * anim);
-            opacity *= clamp((1.0 - step(off + 0.1, u_time * anim)) * 1.25, 1.0, 1.25);
-            float hf = ${intensity.toFixed(4)};
-            vec2 mp = vec2(${pos[0].toFixed(4)}, ${pos[1].toFixed(4)}) * u_resolution / u_total_size;
-            float d = distance(st2, mp);
-            if (d < 150.0) {
-              float cf = smoothstep(150.0, 0.0, d) * hf;
-              vec3 hc = clamp(u_colors[int(mod(random(st2) * 10.0, 6.0))] * 1.5, vec3(0.0), vec3(1.0));
-              color = mix(color, hc, cf * 0.9);
-              opacity = mix(opacity, min(opacity * 1.5, 1.0), cf * 0.7);
-            }`}
-          center={["x", "y"]} />
-      </div>
-      {showGradient && <div className="absolute inset-0 bg-gradient-to-t from-background to-[60%]" />}
-    </div>
-  );
-};
+      // Text mask
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = canvas.width;
+      maskCanvas.height = canvas.height;
+      const maskCtx = maskCanvas.getContext("2d");
+      if (maskCtx && displayText) {
+        maskCtx.scale(dpr, dpr);
+        maskCtx.fillStyle = "white";
+        maskCtx.font = `600 ${tablet ? 70 : 90}px Inter, system-ui, sans-serif`;
+        maskCtx.textAlign = "center";
+        maskCtx.textBaseline = "middle";
+        maskCtx.fillText(displayText, canvas.width / (2 * dpr), canvas.height / (2 * dpr));
+      }
 
-/* ─── Three.js Shader Wrapper ─── */
-const ShaderMaterial = ({ source, uniforms, maxFps = 60 }: { source: string; maxFps?: number; uniforms: Uniforms }) => {
-  const { size } = useThree();
-  const ref = useRef<THREE.Mesh>(null);
-  let lastTime = 0;
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const x = i * (squareSize + gridGap) * dpr;
+          const y = j * (squareSize + gridGap) * dpr;
+          const sw = squareSize * dpr;
+          const sh = squareSize * dpr;
 
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.getElapsedTime();
-    if (t - lastTime < 1 / maxFps) return;
-    lastTime = t;
-    (ref.current.material as unknown as { uniforms: { u_time: { value: number } } }).uniforms.u_time.value = t;
-  });
+          const maskData = maskCtx?.getImageData(x, y, sw, sh).data;
+          const hasText = maskData?.some((v, idx) => idx % 4 === 0 && v > 0);
 
-  const material = useMemo(() => {
-    const getUniforms = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const u: Record<string, any> = {};
-      for (const k in uniforms) {
-        const v = uniforms[k];
-        switch (v.type) {
-          case "uniform1f": u[k] = { value: v.value, type: "1f" }; break;
-          case "uniform3f": u[k] = { value: new THREE.Vector3().fromArray(v.value as number[]), type: "3f" }; break;
-          case "uniform1fv": u[k] = { value: v.value, type: "1fv" }; break;
-          case "uniform3fv": u[k] = { value: (v.value as number[][]).map((a) => new THREE.Vector3().fromArray(a)), type: "3fv" }; break;
-          case "uniform2f": u[k] = { value: new THREE.Vector2().fromArray(v.value as number[]), type: "2f" }; break;
+          const opacity = squares[i * rows + j];
+          const finalOpacity = hasText
+            ? Math.min(1, opacity * 3 + 0.4)
+            : opacity;
+
+          ctx!.fillStyle = `rgba(107, 114, 128, ${finalOpacity})`;
+          ctx!.fillRect(x, y, sw, sh);
         }
       }
-      u.u_time = { value: 0, type: "1f" };
-      u.u_resolution = { value: new THREE.Vector2(size.width * 2, size.height * 2) };
-      return u;
+
+      // Update flicker
+      for (let i = 0; i < squares.length; i++) {
+        if (Math.random() < flickerChance * 0.016) {
+          squares[i] = Math.random() * maxOpacity;
+        }
+      }
+
+      if (isInView) animationId = requestAnimationFrame(draw);
     };
-    return new THREE.ShaderMaterial({
-      vertexShader: `
-        precision mediump float; in vec2 coordinates; uniform vec2 u_resolution; out vec2 fragCoord;
-        void main(){
-          gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-          fragCoord = (position.xy + vec2(1.0)) * 0.5 * u_resolution;
-          fragCoord.y = u_resolution.y - fragCoord.y;
-        }`,
-      fragmentShader: source,
-      uniforms: getUniforms(),
-      glslVersion: THREE.GLSL3,
-      blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor,
-    });
-  }, [size.width, size.height, source, uniforms]);
+
+    const ro = new ResizeObserver(() => { setup(); });
+    ro.observe(container);
+
+    const io = new IntersectionObserver(([e]) => setIsInView(e.isIntersecting), { threshold: 0 });
+    io.observe(canvas);
+
+    if (isInView) animationId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      ro.disconnect();
+      io.disconnect();
+    };
+  }, [isInView, text, tablet]);
 
   return (
-    <mesh ref={ref as React.Ref<THREE.Mesh>}>
-      <planeGeometry args={[2, 2]} />
-      <primitive object={material} attach="material" />
-    </mesh>
+    <div ref={containerRef} className={className}>
+      <canvas ref={canvasRef} className="pointer-events-none w-full h-full" />
+    </div>
   );
-};
+}
 
-const Shader: React.FC<ShaderProps> = ({ source, uniforms, maxFps = 60 }) => (
-  <Canvas className="absolute inset-0 h-full w-full">
-    <ShaderMaterial source={source} uniforms={uniforms} maxFps={maxFps} />
-  </Canvas>
-);
-
-/* ─── Main Footer Export ─── */
+/* ─── Main Footer ─── */
 export function AnimatedFooter({
-  heading = { line1: "Ready to", line2: "contribute?", line3: "Let's go." },
-  socialLinks = [
-    { href: "https://github.com/eniyos/oprepo", icon: <FaGithub size={20} />, ariaLabel: "GitHub" },
-    { href: "https://x.com", icon: <FaXTwitter size={20} />, ariaLabel: "Twitter" },
-  ],
-  links = [
-    { label: "Discover", href: "/" }, { label: "Recommend", href: "/recommend" },
-    { label: "History", href: "/history" }, { label: "Add Repo", href: "/ingest" },
-    { label: "GitHub", href: "https://github.com/eniyos/oprepo" },
-  ],
   companyDescription = "OpRepo connects developers with open-source repositories they'll love contributing to. Our ML-powered engine analyzes your skills and matches you with projects that fit.",
-  copyright = { companyName: "OpRepo", year: new Date().getFullYear(), additionalText: "Find your next open-source contribution." },
-}: FooterProps) {
+}: {
+  companyDescription?: string;
+}) {
   return (
-    <footer className="w-full bg-background border-t border-border/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
-        {/* Heading */}
-        <div className="text-center mb-16 lg:mb-20">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight leading-[1.15]">
-            {heading.line1}<br />
-            <span className="text-gradient font-medium">{heading.line2}</span><br />
-            {heading.line3}
-          </h2>
-        </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-12 border-t border-border/50">
-
-          {/* Social icons (desktop: cols 1-2) */}
-          <div className="hidden lg:flex lg:col-span-1 border-r border-b border-border/50 items-center justify-center py-10">
-            <AnimatedIconLink href={socialLinks[0]?.href ?? "#"} icon={socialLinks[0]?.icon} ariaLabel={socialLinks[0]?.ariaLabel ?? ""} />
-          </div>
-          <div className="hidden lg:flex lg:col-span-1 border-r border-b border-border/50 items-center justify-center py-10">
-            <AnimatedIconLink href={socialLinks[1]?.href ?? "#"} icon={socialLinks[1]?.icon} ariaLabel={socialLinks[1]?.ariaLabel ?? ""} />
-          </div>
-
-          {/* Canvas (desktop: cols 3-10) */}
-          <div className="hidden lg:block lg:col-span-8 border-r border-b border-border/50 relative h-64">
-            <CanvasRevealEffect animationSpeed={5} colors={[[59, 130, 246], [99, 102, 241]]} dotSize={3} />
-          </div>
-
-          {/* Desktop nav right side (cols 11-12) */}
-          <div className="hidden lg:flex lg:col-span-2 flex-col border-b border-border/50">
-            {links.slice(0, 2).map((link) => (
-              <AnimatedLink key={link.label} href={link.href} className="flex-1 text-sm border-b border-border/50 last:border-b-0">
-                {link.label}
-              </AnimatedLink>
+    <footer id="footer" className="w-full pb-0">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between p-8 md:p-12 lg:p-16 gap-10">
+        {/* Brand */}
+        <div className="flex flex-col items-start gap-5 max-w-xs">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+              <div className="h-4 w-4 rounded-[3px] bg-primary" />
+            </div>
+            <span className="text-xl font-semibold text-foreground">OpRepo</span>
+          </Link>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {companyDescription}
+          </p>
+          {/* Social icons */}
+          <div className="flex items-center gap-2.5">
+            {[
+              { href: "https://github.com/eniyos/oprepo", icon: <FaGithub size={18} />, label: "GitHub" },
+              { href: "https://x.com", icon: <FaXTwitter size={18} />, label: "X (Twitter)" },
+            ].map(({ href, icon, label }) => (
+              <Link
+                key={label}
+                href={href}
+                aria-label={label}
+                className="h-9 w-9 rounded-lg border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all duration-200"
+              >
+                {icon}
+              </Link>
             ))}
           </div>
-
-          {/* Description (desktop: cols 1-9) */}
-          <div className="hidden lg:block lg:col-span-9 border-r border-border/50 p-8 text-sm text-muted-foreground leading-relaxed">
-            <p>{companyDescription}</p>
-          </div>
-
-          {/* Desktop nav bottom right (cols 10-12) */}
-          <div className="hidden lg:flex lg:col-span-3">
-            {links.slice(2, 5).map((link, i) => (
-              <AnimatedLink key={link.label} href={link.href} className={`flex-1 text-sm ${i < 2 ? 'border-r border-border/50' : ''}`}>
-                {link.label}
-              </AnimatedLink>
-            ))}
-          </div>
-
-          {/* ─── Mobile layout ─── */}
-
-          {/* Social (mobile) */}
-          <div className="flex lg:hidden col-span-2 border-b border-border/50">
-            {socialLinks.slice(0, 2).map((link, i) => (
-              <AnimatedIconLink key={link.ariaLabel} href={link.href} icon={link.icon} ariaLabel={link.ariaLabel}
-                className={cn("flex-1 py-8 flex items-center justify-center", i === 0 ? "border-r border-border/50" : "")} />
-            ))}
-          </div>
-
-          {/* Canvas (mobile) */}
-          <div className="lg:hidden col-span-2 border-b border-border/50 relative h-48">
-            <CanvasRevealEffect animationSpeed={5} colors={[[59, 130, 246], [99, 102, 241]]} dotSize={3} />
-          </div>
-
-          {/* Nav links (mobile) */}
-          {links.slice(0, 4).map((link, i) => (
-            <AnimatedLink key={link.label} href={link.href}
-              className={`py-8 text-sm border-b border-border/50 ${i % 2 === 0 ? 'border-r border-border/50' : ''} ${i >= 2 ? 'border-b-0' : ''}`}>
-              {link.label}
-            </AnimatedLink>
-          ))}
         </div>
 
-        {/* Copyright */}
-        <div className="pt-10 text-center text-xs text-muted-foreground/60">
-          <p>{copyright.companyName} &copy;{copyright.year} All rights reserved</p>
-          {copyright.additionalText && <p className="mt-1">{copyright.additionalText}</p>}
+        {/* Nav columns */}
+        <div className="w-full md:w-1/2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 md:pl-10">
+            {SITE_LINKS.map((column) => (
+              <ul key={column.title} className="flex flex-col gap-3">
+                <li className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1">
+                  {column.title}
+                </li>
+                {column.links.map((link) => (
+                  <li key={link.id}>
+                    <Link
+                      href={link.href}
+                      className="group inline-flex items-center gap-1 text-sm text-muted-foreground/80 hover:text-foreground transition-colors"
+                    >
+                      <span>{link.label}</span>
+                      <ChevronRight className="h-3.5 w-3.5 translate-x-0 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
         </div>
+      </div>
+
+      {/* Flickering Grid */}
+      <div className="w-full h-48 md:h-64 relative mt-16 z-0">
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent z-10 from-30%" />
+        <div className="absolute inset-0 mx-6">
+          <FlickeringGrid
+            text="Streamline your workflow"
+            className="w-full h-full"
+          />
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div className="border-t border-border/30 px-8 md:px-12 lg:px-16 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground/60">
+        <p>OpRepo &copy; {new Date().getFullYear()}. All rights reserved.</p>
+        <p>Find your next open-source contribution.</p>
       </div>
     </footer>
   );

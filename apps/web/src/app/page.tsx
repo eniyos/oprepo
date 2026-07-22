@@ -10,8 +10,8 @@ import {
   BarChart3,
   Shield,
   UserPlus,
+  Github,
 } from 'lucide-react';
-import { FaGithub, FaXTwitter } from 'react-icons/fa6';
 import { InteractiveRobotSpline } from '@/components/blocks/interactive-3d-robot';
 import { AnimatedFooter } from '@/components/blocks/animated-footer';
 
@@ -89,7 +89,7 @@ export default function HomePage() {
                   href="/ingest"
                   className="inline-flex items-center gap-2.5 rounded-xl glass glass-hover px-7 py-3.5 font-medium text-foreground transition-all"
                 >
-                  <FaGithub className="h-4 w-4" />
+                  <Github className="h-4 w-4" />
                   Add Repository
                 </Link>
               </div>
@@ -291,30 +291,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Footer ─── */}
-      <AnimatedFooter
-        heading={{
-          line1: "Ready to",
-          line2: "contribute?",
-          line3: "Let's go.",
-        }}
-        links={[
-          { label: "Discover", href: "/" },
-          { label: "Recommend", href: "/recommend" },
-          { label: "History", href: "/history" },
-          { label: "Add Repo", href: "/ingest" },
-          { label: "GitHub", href: "https://github.com/eniyos/oprepo" },
-        ]}
-        socialLinks={[
-          { href: "https://github.com/eniyos/oprepo", icon: <FaGithub size={24} />, ariaLabel: "GitHub" },
-          { href: "https://x.com", icon: <FaXTwitter size={24} />, ariaLabel: "Twitter" },
-        ]}
-        copyright={{
-          companyName: "OpRepo",
-          year: new Date().getFullYear(),
-          additionalText: "Find your next open-source contribution.",
-        }}
-        companyDescription="OpRepo connects developers with open-source repositories they'll love contributing to. Our ML-powered engine analyzes your skills and matches you with projects that fit."
-      />
+      <AnimatedFooter />
     </div>
   );
 }
