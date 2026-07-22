@@ -6,6 +6,7 @@ node_modules/
 dist/
 .next/
 *.tsbuildinfo
+.turbo/
 test/*.spec.js
 test/*.spec.d.ts
 test/*.spec.js.map
