@@ -175,10 +175,10 @@ export class MatchingEngine {
 
     // --- Weighted blend ---
     const totalScore = Math.max(0, Math.min(1,
-      skillScore * 0.40 +
-      domainScore * 0.25 +
-      popularityScore * 0.15 +
-      healthScore * 0.15 +
+      skillScore * 0.45 +
+      domainScore * 0.30 +
+      popularityScore * 0.10 +
+      healthScore * 0.10 +
       issueBonus -
       diffPenalty
     ));

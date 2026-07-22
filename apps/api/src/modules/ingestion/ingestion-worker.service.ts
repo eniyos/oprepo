@@ -156,15 +156,20 @@ export class IngestionWorker extends WorkerHost {
     const map: Record<string, string> = {
       react: 'frontend', vue: 'frontend', angular: 'frontend', svelte: 'frontend',
       css: 'frontend', ui: 'frontend', design: 'frontend',
+      frontend: 'frontend', 'web-app': 'frontend',
       api: 'backend', server: 'backend', backend: 'backend', graphql: 'backend',
-      database: 'database', sql: 'database',
-      cli: 'devtools', devtools: 'devtools',
-      'machine-learning': 'ml', ai: 'ml', 'deep-learning': 'ml', neural: 'ml',
-      data: 'data', analytics: 'data',
+      'rest-api': 'backend', middleware: 'backend',
+      database: 'database', sql: 'database', nosql: 'database',
+      cli: 'devtools', devtools: 'devtools', compiler: 'devtools',
+      'machine-learning': 'ml', 'deep-learning': 'ml', neural: 'ml', 'data-science': 'ml',
+      analytics: 'data', visualization: 'data',
       mobile: 'mobile', ios: 'mobile', android: 'mobile',
-      testing: 'testing', security: 'security', blockchain: 'blockchain',
+      testing: 'testing', test: 'testing',
+      security: 'security', auth: 'security', authentication: 'security',
+      blockchain: 'blockchain', web3: 'blockchain', crypto: 'blockchain',
       devops: 'infrastructure', docker: 'infrastructure', kubernetes: 'infrastructure',
-      docs: 'documentation',
+      docs: 'documentation', editor: 'devtools', electron: 'frontend',
+      language: 'devtools', 'programming-language': 'devtools',
     };
     if (data.topics) for (const t of data.topics) {
       const l = t.toLowerCase();
@@ -172,16 +177,14 @@ export class IngestionWorker extends WorkerHost {
     }
     if (data.description) {
       const d = data.description.toLowerCase();
-      if (d.includes('react') || d.includes('ui') || d.includes('component')) tags.add('frontend');
-      if (d.includes('api') || d.includes('server')) tags.add('backend');
-      if (d.includes('machine learning') || d.includes('ai')) tags.add('ml');
-      if (d.includes('database') || d.includes('storage')) tags.add('database');
+      if (d.includes('react') || d.includes('web ui') || d.includes('user interface')) tags.add('frontend');
+      if (d.includes('rest api') || d.includes('http') || d.includes('server') || d.includes('backend') || d.includes('web framework')) tags.add('backend');
+      if (d.includes('machine learning') || d.includes('deep learning') || d.includes('ai')) tags.add('ml');
+      if (d.includes('database') || d.includes('storage engine')) tags.add('database');
+      if (d.includes('cli') || d.includes('command line') || d.includes('terminal')) tags.add('devtools');
+      if (d.includes('programming language') || d.includes('runtime') || d.includes('compiler')) tags.add('devtools');
     }
-    if (data.language) {
-      const l = data.language.toLowerCase();
-      if (['javascript', 'typescript', 'css', 'html'].includes(l)) tags.add('frontend');
-      if (['python', 'go', 'rust', 'java', 'c#'].includes(l)) tags.add('backend');
-    }
+    // No language-based inference — too many false positives
     return [...tags];
   }
 

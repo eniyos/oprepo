@@ -164,17 +164,21 @@ export class GithubIngestionService {
     const topicDomains: Record<string, string> = {
       react: 'frontend', vue: 'frontend', angular: 'frontend', svelte: 'frontend',
       css: 'frontend', ui: 'frontend', design: 'frontend',
+      frontend: 'frontend', 'web-app': 'frontend',
       api: 'backend', server: 'backend', backend: 'backend', graphql: 'backend',
-      database: 'database', db: 'database', sql: 'database', nosql: 'database',
-      cli: 'devtools', devtools: 'devtools', developer: 'devtools',
-      machine: 'ml', 'machine-learning': 'ml', ai: 'ml', 'deep-learning': 'ml',
-      data: 'data', analytics: 'data', visualization: 'data',
+      'rest-api': 'backend', middleware: 'backend',
+      database: 'database', sql: 'database', nosql: 'database',
+      cli: 'devtools', devtools: 'devtools', compiler: 'devtools',
+      'machine-learning': 'ml', ai: 'ml', 'deep-learning': 'ml', neural: 'ml', 'data-science': 'ml',
+      analytics: 'data', visualization: 'data',
       mobile: 'mobile', ios: 'mobile', android: 'mobile',
-      testing: 'testing', test: 'testing', 'unit-test': 'testing',
-      security: 'security', auth: 'security',
+      testing: 'testing', test: 'testing',
+      security: 'security', auth: 'security', authentication: 'security',
       blockchain: 'blockchain', web3: 'blockchain', crypto: 'blockchain',
       devops: 'infrastructure', docker: 'infrastructure', kubernetes: 'infrastructure', deploy: 'infrastructure',
       docs: 'documentation', documentation: 'documentation',
+      editor: 'devtools', electron: 'frontend',
+      language: 'devtools', 'programming-language': 'devtools',
     };
 
     // From topics
@@ -187,23 +191,19 @@ export class GithubIngestionService {
       }
     }
 
-    // From description
+    // From description (more specific, fewer false positives)
     if (data.description) {
       const desc = data.description.toLowerCase();
-      if (desc.includes('react') || desc.includes('ui') || desc.includes('component')) tags.add('frontend');
-      if (desc.includes('api') || desc.includes('server') || desc.includes('backend')) tags.add('backend');
-      if (desc.includes('machine learning') || desc.includes('ai') || desc.includes('neural')) tags.add('ml');
-      if (desc.includes('database') || desc.includes('storage')) tags.add('database');
-      if (desc.includes('cli') || desc.includes('command line')) tags.add('devtools');
+      if (desc.includes('react') || desc.includes('web ui') || desc.includes('user interface')) tags.add('frontend');
+      if (desc.includes('rest api') || desc.includes('http') || desc.includes('server') || desc.includes('backend') || desc.includes('web framework')) tags.add('backend');
+      if (desc.includes('machine learning') || desc.includes('deep learning') || desc.includes('ai') || desc.includes('neural network')) tags.add('ml');
+      if (desc.includes('database') || desc.includes('storage engine')) tags.add('database');
+      if (desc.includes('cli') || desc.includes('command line') || desc.includes('terminal')) tags.add('devtools');
+      if (desc.includes('programming language') || desc.includes('runtime') || desc.includes('compiler')) tags.add('devtools');
     }
 
-    // From language
-    if (data.language) {
-      const lang = data.language.toLowerCase();
-      if (['javascript', 'typescript', 'css', 'html'].includes(lang)) tags.add('frontend');
-      if (['python', 'go', 'rust', 'java', 'c#', 'ruby', 'php'].includes(lang)) tags.add('backend');
-      if (['python', 'r'].includes(lang)) tags.add('data');
-    }
+    // No language-based inference — causes too many false positives
+    // (e.g., Express is backend but JS language would tag it frontend)
 
     return [...tags];
   }
