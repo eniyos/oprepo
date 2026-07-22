@@ -7,6 +7,7 @@ import { GithubModule } from './modules/github/github.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { MlModule } from './modules/ml/ml.module';
 import { ApiConfig } from './config/api.config';
+import { CronModule } from './modules/cron/cron.module';
 import { SnakeNamingStrategy } from './config/snake-naming.strategy';
 
 @Module({
@@ -34,6 +35,7 @@ import { SnakeNamingStrategy } from './config/snake-naming.strategy';
     GithubModule,
     RecommendationModule,
     MlModule,
+    CronModule,
   ],
 })
 export class AppModule {}

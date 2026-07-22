@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Code2, GitFork, Search } from 'lucide-react';
+import { Clock, Code2, GitFork, Search } from 'lucide-react';
 
 export function Header() {
   return (
@@ -23,6 +23,13 @@ export function Header() {
           >
             <GitFork className="h-4 w-4" />
             Recommend
+          </Link>
+          <Link
+            href="/history"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Clock className="h-4 w-4" />
+            History
           </Link>
           <Link
             href="/ingest"
