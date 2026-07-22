@@ -48,10 +48,14 @@ export class GithubIngestionService {
         homepage: data.homepage,
         license: data.license?.spdx_id,
         primaryLanguage: data.language,
+        secondaryLanguages: data.language ? [data.language] : [],
+        domainTags: this.inferDomainTags(data),
         stargazersCount: data.stargazers_count,
         forksCount: data.forks_count,
         openIssuesCount: data.open_issues_count,
         hasCodeOfConduct: !!data.code_of_conduct,
+        communityHealthScore: this.computeHealthScore(data),
+        recentCommitFrequency: data.pushed_at ? 1 : 0,
       });
 
       await this.repoRepo.save(repo);
@@ -150,5 +154,95 @@ export class GithubIngestionService {
       return 'advanced';
     }
     return undefined;
+  }
+
+  /**
+   * Infer domain tags from repo description, topics, and language.
+   */
+  private inferDomainTags(data: any): string[] {
+    const tags = new Set<string>();
+    const topicDomains: Record<string, string> = {
+      react: 'frontend', vue: 'frontend', angular: 'frontend', svelte: 'frontend',
+      css: 'frontend', ui: 'frontend', design: 'frontend',
+      api: 'backend', server: 'backend', backend: 'backend', graphql: 'backend',
+      database: 'database', db: 'database', sql: 'database', nosql: 'database',
+      cli: 'devtools', devtools: 'devtools', developer: 'devtools',
+      machine: 'ml', 'machine-learning': 'ml', ai: 'ml', 'deep-learning': 'ml',
+      data: 'data', analytics: 'data', visualization: 'data',
+      mobile: 'mobile', ios: 'mobile', android: 'mobile',
+      testing: 'testing', test: 'testing', 'unit-test': 'testing',
+      security: 'security', auth: 'security',
+      blockchain: 'blockchain', web3: 'blockchain', crypto: 'blockchain',
+      devops: 'infrastructure', docker: 'infrastructure', kubernetes: 'infrastructure', deploy: 'infrastructure',
+      docs: 'documentation', documentation: 'documentation',
+    };
+
+    // From topics
+    if (data.topics) {
+      for (const topic of data.topics) {
+        const lower = topic.toLowerCase();
+        for (const [key, domain] of Object.entries(topicDomains)) {
+          if (lower.includes(key)) tags.add(domain);
+        }
+      }
+    }
+
+    // From description
+    if (data.description) {
+      const desc = data.description.toLowerCase();
+      if (desc.includes('react') || desc.includes('ui') || desc.includes('component')) tags.add('frontend');
+      if (desc.includes('api') || desc.includes('server') || desc.includes('backend')) tags.add('backend');
+      if (desc.includes('machine learning') || desc.includes('ai') || desc.includes('neural')) tags.add('ml');
+      if (desc.includes('database') || desc.includes('storage')) tags.add('database');
+      if (desc.includes('cli') || desc.includes('command line')) tags.add('devtools');
+    }
+
+    // From language
+    if (data.language) {
+      const lang = data.language.toLowerCase();
+      if (['javascript', 'typescript', 'css', 'html'].includes(lang)) tags.add('frontend');
+      if (['python', 'go', 'rust', 'java', 'c#', 'ruby', 'php'].includes(lang)) tags.add('backend');
+      if (['python', 'r'].includes(lang)) tags.add('data');
+    }
+
+    return [...tags];
+  }
+
+  /**
+   * Compute a community health score (0-1) from repo metadata.
+   */
+  private computeHealthScore(data: any): number {
+    let score = 0.3; // base
+
+    // Has description
+    if (data.description && data.description.length > 20) score += 0.1;
+
+    // Has topics
+    if (data.topics && data.topics.length > 0) score += 0.1;
+
+    // Has license
+    if (data.license) score += 0.1;
+
+    // Recent activity (pushed within 3 months)
+    if (data.pushed_at) {
+      const pushed = new Date(data.pushed_at);
+      const threeMonths = new Date();
+      threeMonths.setMonth(threeMonths.getMonth() - 3);
+      if (pushed > threeMonths) score += 0.15;
+    }
+
+    // Good ratio of closed to open issues indicates active maintenance
+    if (data.open_issues_count > 0 && data.forks_count > 0) {
+      score += 0.1;
+    }
+
+    // Has homepage/website
+    if (data.homepage) score += 0.05;
+
+    // Large projects tend to have better maintenance
+    if (data.stargazers_count > 1000) score += 0.1;
+    if (data.stargazers_count > 10000) score += 0.1;
+
+    return Math.min(Math.round(score * 100) / 100, 1);
   }
 }

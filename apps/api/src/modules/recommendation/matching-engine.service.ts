@@ -120,15 +120,23 @@ export class MatchingEngine {
   ): ScoredResult {
     const isIssue = focus === 'issues';
     const repo = isIssue ? candidate.repository : candidate;
-    const repoLanguages = repo?.secondaryLanguages || [];
     const repoTopics = repo?.topics || [];
     const repoDomainTags = repo?.domainTags || [];
+
+    // --- Collect all languages from the repo (primary + secondary) ---
+    const repoLanguages: string[] = [];
+    if (repo?.primaryLanguage) repoLanguages.push(repo.primaryLanguage);
+    if (repo?.secondaryLanguages?.length) {
+      for (const lang of repo.secondaryLanguages) {
+        if (!repoLanguages.includes(lang)) repoLanguages.push(lang);
+      }
+    }
 
     // --- Skill overlap ---
     const skillOverlap: string[] = [];
     for (const lang of repoLanguages) {
       if (devLanguages.has(lang.toLowerCase())) {
-        skillOverlap.push(lang);
+        if (!skillOverlap.includes(lang)) skillOverlap.push(lang);
       }
     }
 
@@ -136,36 +144,41 @@ export class MatchingEngine {
     const domainOverlap: string[] = [];
     for (const tag of [...repoDomainTags, ...repoTopics]) {
       if (devDomains.has(tag.toLowerCase()) || devInterests.has(tag.toLowerCase())) {
-        domainOverlap.push(tag);
+        if (!domainOverlap.includes(tag)) domainOverlap.push(tag);
       }
     }
 
-    // --- Compute score components ---
-    const skillScore = repoLanguages.length > 0
-      ? skillOverlap.length / Math.min(repoLanguages.length, 5)
-      : 0.2;
+    // --- Compute score components (each 0-1) ---
+    const hasLangData = repoLanguages.length > 0;
+    const skillScore = hasLangData
+      ? Math.min(skillOverlap.length / Math.min(repoLanguages.length, 3), 1)
+      : 0;
 
-    const domainScore = repoTopics.length > 0
-      ? domainOverlap.length / Math.min(repoTopics.length, 5)
-      : 0.3;
+    const hasDomainData = repoDomainTags.length > 0 || repoTopics.length > 0;
+    const domainScore = hasDomainData
+      ? Math.min(domainOverlap.length / 2, 1)
+      : 0;
 
-    const popularityScore = repo
-      ? Math.min((repo.stargazersCount || 0) / 10000, 1) * 0.3
-      : 0.3;
+    // Popularity: logarithmic scale gives better differentiation
+    const stars = repo?.stargazersCount || 0;
+    const popularityScore = stars > 0
+      ? Math.min(Math.log10(stars) / 5, 1) // log10(100k)=5 → 1, log10(1k)=3 → 0.6
+      : 0;
 
-    const healthScore = repo?.communityHealthScore || 0.5;
+    const healthScore = repo?.communityHealthScore || 0;
 
     const issueBonus = isIssue && candidate.labels?.some((l: string) =>
       l.toLowerCase().includes('good first issue') || l.toLowerCase().includes('help wanted')
-    ) ? 0.2 : 0;
+    ) ? 0.15 : 0;
 
     const diffPenalty = this.difficultyPenalty(candidate, developer, isIssue);
 
+    // --- Weighted blend ---
     const totalScore = Math.max(0, Math.min(1,
-      skillScore * 0.35 +
+      skillScore * 0.40 +
       domainScore * 0.25 +
       popularityScore * 0.15 +
-      healthScore * 0.1 +
+      healthScore * 0.15 +
       issueBonus -
       diffPenalty
     ));
