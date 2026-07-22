@@ -95,7 +95,7 @@ export default function HistoryPage() {
               value={developerId}
               onChange={(e) => setDeveloperId(e.target.value)}
               placeholder="e.g. e04e6888-b6f1-432b-a1dd-51e62dee4ae5"
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)] font-mono"
+              className="w-full rounded-lg border border-border bg-white/[0.04] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/50 font-mono"
               required
             />
           </div>
@@ -103,7 +103,7 @@ export default function HistoryPage() {
             <button
               type="submit"
               disabled={loading || !developerId.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -169,21 +169,21 @@ export default function HistoryPage() {
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs font-medium text-[var(--accent-foreground)]">
+                          <span className="rounded-full glass px-2 py-0.5 text-xs font-medium">
                             {item.type}
                           </span>
-                          <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          <span className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400 border border-blue-500/20">
                             <TrendingUp className="h-3 w-3" />
                             {(item.matchScore * 100).toFixed(0)}% match
                           </span>
                           {item.feedback === 'positive' && (
-                            <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
+                            <span className="flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 border border-green-500/20">
                               <ThumbsUp className="h-3 w-3" />
                               Liked
                             </span>
                           )}
                           {item.feedback === 'negative' && (
-                            <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-400">
+                            <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 border border-red-500/20">
                               <ThumbsDown className="h-3 w-3" />
                               Not relevant
                             </span>

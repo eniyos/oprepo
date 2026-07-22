@@ -90,7 +90,7 @@ export default function RecommendPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. octocat"
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="w-full rounded-lg border border-border bg-white/[0.04] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/50"
               required
             />
           </div>
@@ -99,7 +99,7 @@ export default function RecommendPage() {
             <select
               value={focus}
               onChange={(e) => setFocus(e.target.value as 'repos' | 'issues')}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="w-full rounded-lg border border-border bg-white/[0.04] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="repos">Repositories</option>
               <option value="issues">Issues</option>
@@ -109,7 +109,7 @@ export default function RecommendPage() {
             <button
               type="submit"
               disabled={loading || !username.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -161,17 +161,17 @@ export default function RecommendPage() {
                       </a>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[var(--accent)] px-2.5 py-0.5 text-xs font-medium text-[var(--accent-foreground)]">
+                      <span className="rounded-full glass px-2.5 py-0.5 text-xs font-medium">
                         {rec.fitSignals.difficulty}
                       </span>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         rec.fitSignals.communityHealth === 'high'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                          ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                          : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                       }`}>
                         {rec.fitSignals.communityHealth} health
                       </span>
-                      <span className="rounded-full bg-[var(--secondary)] px-2.5 py-0.5 text-xs font-medium text-[var(--secondary-foreground)]">
+                      <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium border border-white/[0.08]">
                         {(rec.score * 100).toFixed(0)}% match
                       </span>
                     </div>

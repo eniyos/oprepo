@@ -1,135 +1,320 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, GitPullRequest, Sparkles, Users, Code2 } from 'lucide-react';
+import {
+  ArrowRight,
+  GitPullRequest,
+  Sparkles,
+  Users,
+  Star,
+  BarChart3,
+  Shield,
+  UserPlus,
+} from 'lucide-react';
+import { FaGithub, FaXTwitter } from 'react-icons/fa6';
 import { InteractiveRobotSpline } from '@/components/blocks/interactive-3d-robot';
+import { AnimatedFooter } from '@/components/blocks/animated-footer';
 
 const ROBOT_SCENE_URL =
   'https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode';
 
+function FadeInSection({
+  children,
+  delay = 0,
+  className = '',
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`animate-fade-up opacity-0 ${className}`}
+      style={{ animationDelay: `${delay}s`, animationFillMode: 'forwards' }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <div className="flex flex-col">
-      {/* ─── Hero Section with 3D Robot ─── */}
-      <section className="relative w-full h-screen overflow-hidden">
+      {/* ─── Hero ─── */}
+      <section className="relative w-full h-screen overflow-hidden bg-[hsl(228,12%,6%)]">
+        {/* Ambient glow */}
+        <div className="absolute inset-0 bg-glow z-[1]" />
+
         <InteractiveRobotSpline
           scene={ROBOT_SCENE_URL}
           className="absolute inset-0 z-0"
         />
 
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-4 pointer-events-none">
-          <div className="text-center text-white drop-shadow-lg w-full max-w-3xl mx-auto">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <Code2 className="h-10 w-10" />
-              <span className="text-3xl font-bold tracking-tight">OpRepo</span>
-            </div>
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight">
-              Find your next
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-cyan-200">
-                open-source contribution
-              </span>
-            </h1>
-            <p className="mt-6 text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
-              OpRepo connects developers with repositories and issues they&apos;ll love.
-              Personalized recommendations matched to your skills, interests, and goals.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 pointer-events-auto">
-              <Link
-                href="/recommend"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 font-semibold text-gray-900 hover:bg-white/90 transition-all shadow-2xl"
-              >
-                Get Recommendations
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-              <Link
-                href="/ingest"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/30 px-8 py-4 font-medium text-white hover:bg-white/10 transition-all"
-              >
-                Add a Repository
-              </Link>
-            </div>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-4">
+          <div className="text-center w-full max-w-4xl mx-auto">
+            <FadeInSection delay={0.1}>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-sm text-blue-200 mb-8">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI-Powered Repository Matching
+              </div>
+            </FadeInSection>
+
+            <FadeInSection delay={0.2}>
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
+                Find your next{' '}
+                <span className="text-gradient block mt-2">
+                  open-source contribution
+                </span>
+              </h1>
+            </FadeInSection>
+
+            <FadeInSection delay={0.35} className="mt-6">
+              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Stop searching aimlessly. OpRepo analyzes your skills and matches
+                you with repositories and issues you&apos;ll actually enjoy
+                contributing to.
+              </p>
+            </FadeInSection>
+
+            <FadeInSection delay={0.5} className="mt-10">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  href="/recommend"
+                  className="group inline-flex items-center gap-2.5 rounded-xl bg-primary px-7 py-3.5 font-semibold text-primary-foreground hover:brightness-110 transition-all shadow-lg shadow-primary/25"
+                >
+                  Get Recommendations
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+                <Link
+                  href="/ingest"
+                  className="inline-flex items-center gap-2.5 rounded-xl glass glass-hover px-7 py-3.5 font-medium text-foreground transition-all"
+                >
+                  <FaGithub className="h-4 w-4" />
+                  Add Repository
+                </Link>
+              </div>
+            </FadeInSection>
+
+            <FadeInSection delay={0.65} className="mt-12">
+              <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  <span>Smart matching</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="h-4 w-4 text-blue-400" />
+                  <span>Skill analysis</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Shield className="h-4 w-4 text-green-400" />
+                  <span>Community health</span>
+                </div>
+              </div>
+            </FadeInSection>
           </div>
         </div>
 
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-background to-transparent z-10" />
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-background via-background/60 to-transparent z-10 pointer-events-none" />
       </section>
 
-      {/* ─── Features Section ─── */}
-      <section className="relative z-20 -mt-2 bg-background px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold tracking-tight">
-              How OpRepo works
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">
-              Three simple steps to finding your next open-source project.
-            </p>
-          </div>
-
-          <div className="grid gap-8 sm:grid-cols-3">
+      {/* ─── Stats Bar ─── */}
+      <section className="relative z-20 border-y border-border/50 bg-card/50">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-3 divide-x divide-border/50">
             {[
-              {
-                icon: Sparkles,
-                title: '1. Connect',
-                desc: 'Enter your GitHub username. We analyze your languages, frameworks, and project interests.',
-              },
-              {
-                icon: Users,
-                title: '2. Match',
-                desc: 'Our engine scores repositories across skill overlap, domain affinity, and community health.',
-              },
-              {
-                icon: GitPullRequest,
-                title: '3. Contribute',
-                desc: 'Get curated recommendations with suggested next steps — from good first issues to advanced challenges.',
-              },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="group rounded-2xl border border-border bg-card p-8 hover:border-primary/50 hover:shadow-lg transition-all"
-              >
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3">{title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{desc}</p>
+              { value: '50+', label: 'Repositories indexed' },
+              { value: '10+', label: 'Languages supported' },
+              { value: 'ML', label: 'Vector similarity engine' },
+            ].map(({ value, label }) => (
+              <div key={label} className="py-8 text-center">
+                <div className="text-2xl font-bold text-gradient">{value}</div>
+                <div className="text-sm text-muted-foreground mt-1">{label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── CTA Section ─── */}
-      <section className="bg-background px-4 pb-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl rounded-3xl bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/20 p-12 text-center">
-          <h2 className="text-3xl font-bold tracking-tight">
-            Ready to find your next contribution?
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-lg mx-auto">
-            No setup required. Just enter your GitHub username and get matched
-            instantly.
-          </p>
-          <Link
-            href="/recommend"
-            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-4 font-semibold text-primary-foreground hover:opacity-90 transition-all shadow-lg"
-          >
-            Get Started
-            <ArrowRight className="h-5 w-5" />
-          </Link>
+      {/* ─── How it Works ─── */}
+      <section className="relative bg-background px-4 py-28 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Grid bg */}
+        <div className="absolute inset-0 bg-grid opacity-40" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
+
+        <div className="relative mx-auto max-w-6xl">
+          <FadeInSection className="text-center mb-20">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              How it works
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-lg mx-auto">
+              From zero to your first contribution in three simple steps.
+            </p>
+          </FadeInSection>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {[
+              {
+                step: '01',
+                icon: UserPlus,
+                title: 'Connect',
+                desc: 'Enter your GitHub username. We analyze your languages, frameworks, and project interests to build your profile.',
+                gradient: 'from-blue-500/20 via-blue-500/5 to-transparent',
+              },
+              {
+                step: '02',
+                icon: Sparkles,
+                title: 'Match',
+                desc: 'Our hybrid engine scores repositories across skill overlap, domain affinity, community health, and ML similarity.',
+                gradient: 'from-purple-500/20 via-purple-500/5 to-transparent',
+              },
+              {
+                step: '03',
+                icon: GitPullRequest,
+                title: 'Contribute',
+                desc: 'Get curated recommendations with clear next steps — from good first issues to advanced features.',
+                gradient: 'from-cyan-500/20 via-cyan-500/5 to-transparent',
+              },
+            ].map(({ step, icon: Icon, title, desc, gradient }) => (
+              <div
+                key={step}
+                className={`group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 hover:bg-white/[0.04] transition-all duration-500`}
+              >
+                {/* Hover glow */}
+                <div
+                  className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+                />
+                <div className="relative">
+                  <span className="text-4xl font-black text-white/[0.04] absolute -top-3 -right-2 select-none">
+                    {step}
+                  </span>
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-white/[0.06] border border-white/[0.08] group-hover:border-primary/30 transition-colors">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-3">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
-      <footer className="border-t border-border px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Code2 className="h-4 w-4" />
-            <span>OpRepo</span>
+      {/* ─── Why OpRepo ─── */}
+      <section className="relative px-4 py-28 sm:px-6 lg:px-8 overflow-hidden bg-card/30">
+        <div className="mx-auto max-w-6xl">
+          <FadeInSection className="text-center mb-20">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              Built for developers
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-lg mx-auto">
+              Every feature designed to make your open-source journey smoother.
+            </p>
+          </FadeInSection>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: Sparkles,
+                title: 'Hybrid AI Matching',
+                desc: 'Combines rule-based scoring with ML vector similarity for recommendations that actually make sense.',
+              },
+              {
+                icon: Users,
+                title: 'Community Health',
+                desc: 'We prioritize repos with active maintainers, clear contributing guides, and welcoming cultures.',
+              },
+              {
+                icon: BarChart3,
+                title: 'Skill Analysis',
+                desc: 'Deep profile analysis across languages, frameworks, domains, and contribution patterns.',
+              },
+              {
+                icon: Shield,
+                title: 'Difficulty Fit',
+                desc: 'Recommendations calibrated to your experience level — from beginner-friendly to advanced challenges.',
+              },
+              {
+                icon: GitPullRequest,
+                title: 'Issue-Level Matches',
+                desc: 'Find specific issues tagged with your skills, from bug fixes to feature development.',
+              },
+              {
+                icon: Star,
+                title: 'Explainable Results',
+                desc: 'Every recommendation comes with clear reasons and suggested next steps you can act on.',
+              },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 hover:bg-white/[0.04] transition-all duration-300"
+              >
+                <div className="mb-4 h-9 w-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center group-hover:border-primary/30 transition-colors">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <h3 className="font-semibold mb-2">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {desc}
+                </p>
+              </div>
+            ))}
           </div>
-          <p>Find your next open-source contribution.</p>
         </div>
-      </footer>
+      </section>
+
+      {/* ─── CTA ─── */}
+      <section className="relative px-4 py-28 sm:px-6 lg:px-8">
+        <div className="absolute inset-0 bg-grid opacity-30" />
+        <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/[0.04] rounded-full blur-3xl" />
+
+        <FadeInSection className="relative mx-auto max-w-2xl text-center">
+          <div className="rounded-2xl glass p-10 sm:p-14">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              Ready to find your next{' '}
+              <span className="text-gradient">contribution</span>?
+            </h2>
+            <p className="mt-4 text-muted-foreground max-w-sm mx-auto">
+              No setup required. Just enter your GitHub username and get matched
+              instantly.
+            </p>
+            <Link
+              href="/recommend"
+              className="group mt-8 inline-flex items-center gap-2.5 rounded-xl bg-primary px-7 py-3.5 font-semibold text-primary-foreground hover:brightness-110 transition-all shadow-lg shadow-primary/25"
+            >
+              Get Started Now
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+        </FadeInSection>
+      </section>
+
+      {/* ─── Footer ─── */}
+      <AnimatedFooter
+        heading={{
+          line1: "Ready to",
+          line2: "contribute?",
+          line3: "Let's go.",
+        }}
+        links={[
+          { label: "Discover", href: "/" },
+          { label: "Recommend", href: "/recommend" },
+          { label: "History", href: "/history" },
+          { label: "Add Repo", href: "/ingest" },
+          { label: "GitHub", href: "https://github.com/eniyos/oprepo" },
+        ]}
+        socialLinks={[
+          { href: "https://github.com/eniyos/oprepo", icon: <FaGithub size={24} />, ariaLabel: "GitHub" },
+          { href: "https://x.com", icon: <FaXTwitter size={24} />, ariaLabel: "Twitter" },
+        ]}
+        copyright={{
+          companyName: "OpRepo",
+          year: new Date().getFullYear(),
+          additionalText: "Find your next open-source contribution.",
+        }}
+        companyDescription="OpRepo connects developers with open-source repositories they'll love contributing to. Our ML-powered engine analyzes your skills and matches you with projects that fit."
+      />
     </div>
   );
 }
