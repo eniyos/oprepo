@@ -6,6 +6,9 @@ node_modules/
 dist/
 .next/
 *.tsbuildinfo
+test/*.js
+test/*.d.ts
+test/*.js.map
 
 # ─── Environment ───────────────────────────────────────────
 .env
