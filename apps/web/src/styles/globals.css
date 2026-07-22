@@ -4,53 +4,57 @@
 
 @layer base {
   :root {
-    --background: #ffffff;
-    --foreground: #0f172a;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --card: #ffffff;
-    --card-foreground: #0f172a;
-    --border: #e2e8f0;
-    --primary: #4c6ef5;
-    --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #0f172a;
-    --accent: #dbe4ff;
-    --accent-foreground: #364fc7;
-    --destructive: #ef4444;
-    --ring: #4c6ef5;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 231 90% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 231 90% 63%;
     --radius: 0.5rem;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: #0f172a;
-      --foreground: #f8fafc;
-      --muted: #1e293b;
-      --muted-foreground: #94a3b8;
-      --card: #1e293b;
-      --card-foreground: #f8fafc;
-      --border: #334155;
-      --primary: #5c7cfa;
-      --primary-foreground: #ffffff;
-      --secondary: #1e293b;
-      --secondary-foreground: #f8fafc;
-      --accent: #1e3a5f;
-      --accent-foreground: #91a7ff;
-    }
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 231 90% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 231 90% 63%;
   }
 }
 
 @layer base {
-  body {
-    background: var(--background);
-    color: var(--foreground);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  * {
+    @apply border-border;
   }
-}
-
-@layer utilities {
-  .prose-code {
-    font-family: 'JetBrains Mono', monospace;
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
