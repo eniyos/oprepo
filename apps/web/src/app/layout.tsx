@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
 import { Header } from '@/components/header';
-import { Inter } from 'next/font/google';
+import { Inter, Poppins } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import Auralis from '@/components/ui/auralis';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const poppins = Poppins({ subsets: ['latin'], weight: ['300', '400', '500'], variable: '--font-heading' });
 
 export const metadata: Metadata = {
   title: 'OpRepo — Find your next open-source contribution',
@@ -27,7 +28,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn('font-sans', inter.variable)}
+      className={cn('font-sans', inter.variable, poppins.variable)}
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,11 +38,11 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="relative min-h-screen font-sans antialiased">
+      <body className="relative min-h-screen antialiased">
         <Auralis
-          colors={["#3b82f6", "#1d4ed8", "#0f172a"]}
-          speed={0.15}
-          grain={0.2}
+          colors={["#2A4A8C", "#4A6FBF", "#0F1A2E"]}
+          speed={0.12}
+          grain={0.18}
           height="100vh"
           className="fixed inset-0 z-0 w-full"
         />
