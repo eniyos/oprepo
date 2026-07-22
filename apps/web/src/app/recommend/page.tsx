@@ -145,7 +145,7 @@ export default function RecommendPage() {
 
           {/* Recommendations */}
           <div className="space-y-4">
-            {result.recommendations.map((rec, i) => (
+            {(result.recommendations ?? []).map((rec, i) => (
               <div key={i} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">

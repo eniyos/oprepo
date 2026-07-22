@@ -135,10 +135,10 @@ export default function HistoryPage() {
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Showing {data.items.length} past recommendation{data.items.length !== 1 ? 's' : ''}
+                Showing {(data.items ?? []).length} past recommendation{(data.items ?? []).length !== 1 ? 's' : ''}
               </p>
 
-              {data.items.map((item) => {
+              {(data.items ?? []).map((item) => {
                 const title = item.type === 'repo'
                   ? item.repository?.fullName ?? 'Unknown repo'
                   : item.issue?.title ?? 'Unknown issue';

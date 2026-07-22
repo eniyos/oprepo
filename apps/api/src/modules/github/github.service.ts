@@ -1,30 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository as TypeOrmRepo } from 'typeorm';
-import axios from 'axios';
-import { Developer } from '../../database/entities/developer.entity';
+import axios, { AxiosInstance } from 'axios';
 
 @Injectable()
 export class GithubService {
   private readonly logger = new Logger(GithubService.name);
-  private readonly apiBase: string;
-  private readonly token: string;
+  private readonly client: AxiosInstance;
 
   constructor(private config: ConfigService) {
-    this.apiBase = this.config.get('api.github.apiBase')!;
-    this.token = this.config.get('api.github.token')!;
-  }
-
-  private get client() {
+    const apiBase = this.config.get('api.github.apiBase')!;
+    const token = this.config.get('api.github.token')!;
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github.v3+json',
     };
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-    return axios.create({
-      baseURL: this.apiBase,
+    this.client = axios.create({
+      baseURL: apiBase,
       headers,
     });
   }
