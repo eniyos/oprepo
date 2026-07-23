@@ -6,6 +6,7 @@ import axios, { AxiosInstance } from 'axios';
 import { Repository } from '../../database/entities/repository.entity';
 import { Issue } from '../../database/entities/issue.entity';
 import { MlService } from '../ml/ml.service';
+import { QdrantService } from '../qdrant/qdrant.service';
 
 @Injectable()
 export class GithubIngestionService {
@@ -19,6 +20,7 @@ export class GithubIngestionService {
     @InjectRepository(Issue)
     private issueRepo: TypeOrmRepo<Issue>,
     private mlService: MlService,
+    private qdrant: QdrantService,
   ) {
     const apiBase = this.config.get('api.github.apiBase')!;
     const token = this.config.get('api.github.token')!;
@@ -75,17 +77,46 @@ export class GithubIngestionService {
   }
 
   /**
-   * Generate and persist vector embedding for a repository.
+   * Generate and persist vector embedding to Qdrant instead of pgvector.
    */
   private async generateRepoEmbedding(repo: Repository) {
     try {
       const text = this.mlService.buildRepoText(repo);
       if (!text) return;
       const embedding = await this.mlService.embedText(text);
-      await this.repoRepo.update(repo.id, { embeddings: embedding as any });
-      this.logger.debug(`Generated embedding for ${repo.fullName}`);
+      if (!embedding || embedding.length !== 384) return;
+
+      // Determine tier based on stars
+      const tier =
+        repo.stargazersCount > 5000
+          ? 'popular'
+          : repo.stargazersCount > 500
+            ? 'mid'
+            : 'niche';
+
+      await this.qdrant.upsertPoint(repo.id, embedding, {
+        fullName: repo.fullName,
+        description: repo.description,
+        topics: repo.topics,
+        domainTags: repo.domainTags,
+        primaryLanguage: repo.primaryLanguage,
+        secondaryLanguages: repo.secondaryLanguages,
+        stargazersCount: repo.stargazersCount,
+        forksCount: repo.forksCount,
+        openIssuesCount: repo.openIssuesCount,
+        communityHealthScore: repo.communityHealthScore,
+        hasContributingGuide: repo.hasContributingGuide,
+        hasCodeOfConduct: repo.hasCodeOfConduct,
+        license: repo.license,
+        homepage: repo.homepage,
+        tier,
+        trendingScore: 0,
+        lastStarSnapshot: repo.stargazersCount,
+      });
+
+      this.logger.debug(`Upserted Qdrant point for ${repo.fullName} (tier: ${tier})`);
     } catch (e) {
-      this.logger.warn(`Failed to generate embedding for ${repo.fullName}, skipping`, e);
+      this.logger.warn(`Failed to generate/upsert embedding for ${repo.fullName}, skipping`, e);
     }
   }
 
@@ -116,9 +147,28 @@ export class GithubIngestionService {
     if (labels?.length) params.labels = labels.join(',');
 
     try {
-      const { data: issues } = await this.client.get(`/repos/${fullName}/issues`, { params });
+      const allIssues: any[] = [];
+      let page = 1;
+      let hasMoreResults = true;
+      
+      // Paginate issues - continue while there are more results available
+      while (hasMoreResults) {
+        const { data: issues } = await this.client.get(`/repos/${fullName}/issues`, { params: { ...params, page } });
+        
+        if (!issues.length) {
+          hasMoreResults = false;
+        } else {
+          allIssues.push(...issues);
+          // If we got fewer than max per page, this is the last page
+          if (issues.length < 100) {
+            hasMoreResults = false;
+          } else {
+            page++;
+          }
+        }
+      }
 
-      const entities = issues
+      const entities = allIssues
         .filter((i: any) => !i.pull_request)
         .map((i: any) =>
           this.issueRepo.create({
@@ -187,7 +237,7 @@ export class GithubIngestionService {
       }
     }
 
-    // From description
+      // From description
     if (data.description) {
       const desc = data.description.toLowerCase();
       if (desc.includes('react') || desc.includes('ui') || desc.includes('component')) tags.add('frontend');

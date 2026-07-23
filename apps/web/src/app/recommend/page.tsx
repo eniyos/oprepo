@@ -1,26 +1,82 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, Loader2, Sparkles, GitBranch, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Loader2, Sparkles, GitBranch, AlertCircle, TrendingUp, Star, Zap, ExternalLink } from 'lucide-react';
 
-interface Recommendation {
+interface ScoredItem {
+  repoId?: string;
+  issueId?: string;
   title: string;
   url: string;
   score: number;
-  reasons: string[];
-  fitSignals: {
-    skillOverlap: string[];
-    domainOverlap: string[];
-    difficulty: string;
-    communityHealth: string;
-    goalAlignment: string[];
-  };
+  tier: string;
+  starCount: number;
+  trendingScore: number | null;
+  matchReason: string;
+  healthScore: number;
   suggestedNextSteps: string[];
+  reasons: string[];
 }
 
-interface RecommendResponse {
+interface TieredResponse {
   developerSummary: string;
-  recommendations: Recommendation[];
+  bestMatches: ScoredItem[];
+  trending: ScoredItem[];
+  hiddenGems: ScoredItem[];
+}
+
+function RepoRow({ item, section }: { item: ScoredItem; section: 'best' | 'trending' | 'gems' }) {
+  return (
+    <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', transition: 'border-color 600ms ease-out' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.24)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+        <GitBranch style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px', flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: '0.8125rem', color: '#F2F4F8', textDecoration: 'none', transition: 'color 600ms ease-out', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#7C9CF0'}
+              onMouseLeave={e => e.currentTarget.style.color = '#F2F4F8'}>
+              {item.title}
+            </a>
+            <ExternalLink style={{ width: 11, height: 11, color: '#8B92A3', flexShrink: 0 }} />
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#7C9CF0' }}>
+              <Zap style={{ width: 10, height: 10 }} />
+              {(item.score * 100).toFixed(0)}%
+            </span>
+
+            {section === 'trending' && item.trendingScore != null && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
+                <TrendingUp style={{ width: 10, height: 10 }} />
+                +{(item.trendingScore * 100).toFixed(0)}% this week
+              </span>
+            )}
+
+            {section === 'gems' && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
+                <Star style={{ width: 10, height: 10 }} />
+                {item.healthScore > 0.7 ? '92% health' : `${(item.healthScore * 100).toFixed(0)}% health`}
+              </span>
+            )}
+
+            {section !== 'gems' && (
+              <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>
+                {item.starCount >= 1000 ? `${(item.starCount / 1000).toFixed(1)}K` : item.starCount} stars
+              </span>
+            )}
+          </div>
+
+          <p style={{ marginTop: '0.375rem', fontSize: '0.75rem', color: '#8B92A3', lineHeight: 1.4, marginBottom: 0 }}>
+            {item.matchReason}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function RecommendPage() {
@@ -28,7 +84,7 @@ export default function RecommendPage() {
   const [focus, setFocus] = useState<'repos' | 'issues'>('repos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<RecommendResponse | null>(null);
+  const [result, setResult] = useState<TieredResponse | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -48,14 +104,14 @@ export default function RecommendPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           githubUsername: username.trim(),
-          context: { focus, maxResults: 6 },
+          context: { focus, maxResults: 10 },
         }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-      const data: RecommendResponse = await res.json();
+      const data: TieredResponse = await res.json();
       setResult(data);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -68,151 +124,99 @@ export default function RecommendPage() {
     }
   };
 
+  const sections: { key: keyof TieredResponse; title: string; subtitle: string; type: 'best' | 'trending' | 'gems' }[] = [
+    { key: 'bestMatches', title: 'Best matches', subtitle: 'Top recommendations across popular and mid-range repos', type: 'best' },
+    { key: 'trending', title: 'Trending', subtitle: 'Rising projects in your domain', type: 'trending' },
+    { key: 'hiddenGems', title: 'Hidden gems', subtitle: 'Under-the-radar repos worth discovering', type: 'gems' },
+  ];
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8" style={{ paddingTop: '6rem' }}>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Get Recommendations</h1>
-        <p className="mt-2 text-muted-foreground">
-          Enter your GitHub username and we&apos;ll find repositories matched to your skills.
+        <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.25rem)', fontWeight: 300, color: '#F2F4F8', letterSpacing: '0.01em', margin: 0 }}>Get Recommendations</h1>
+        <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: '#8B92A3' }}>
+          Enter your GitHub username. We analyze your skills and find the best repos for you.
         </p>
       </div>
 
-      {/* Input form */}
-      <form onSubmit={handleSubmit} className="mb-10 rounded-xl border border-border bg-card p-6">
+      <form onSubmit={handleSubmit} style={{ marginBottom: '2rem' }}>
         <div className="flex flex-col gap-4 sm:flex-row">
           <div className="flex-1">
-            <label htmlFor="username" className="mb-1.5 block text-sm font-medium">
-              GitHub Username
-            </label>
             <input
-              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. octocat"
-              className="w-full rounded-lg border border-border bg-white/[0.04] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/50"
+              className="input-field"
               required
             />
           </div>
-          <div className="sm:w-40">
-            <label className="mb-1.5 block text-sm font-medium">Focus</label>
-            <select
-              value={focus}
-              onChange={(e) => setFocus(e.target.value as 'repos' | 'issues')}
-              className="w-full rounded-lg border border-border bg-white/[0.04] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="repos">Repositories</option>
-              <option value="issues">Issues</option>
-            </select>
+          <div style={{ display: 'flex', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.12)', overflow: 'hidden', width: '140px' }}>
+            {(['repos', 'issues'] as const).map(tab => (
+              <button key={tab} type="button" onClick={() => setFocus(tab)}
+                style={{
+                  flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.8125rem',
+                  color: focus === tab ? '#7C9CF0' : '#8B92A3',
+                  background: 'transparent', border: 'none', cursor: 'pointer', transition: 'color 600ms ease-out',
+                }}>
+                {tab === 'repos' ? 'Repos' : 'Issues'}
+              </button>
+            ))}
           </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={loading || !username.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-              {loading ? 'Analyzing...' : 'Find Repos'}
-            </button>
-          </div>
+          <button type="submit" disabled={loading || !username.trim()}
+            className="pill-accent" style={{ border: 'none', cursor: loading || !username.trim() ? 'not-allowed' : 'pointer', opacity: loading || !username.trim() ? 0.4 : 1 }}>
+            {loading ? <Loader2 style={{ width: 14, height: 14 }} /> : <ArrowRight style={{ width: 14, height: 14 }} />}
+            {loading ? 'Analyzing...' : 'Find Matches'}
+          </button>
         </div>
       </form>
 
-      {/* Error */}
       {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
+        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '0.375rem', color: '#fca5a5', fontSize: '0.8125rem' }}>
+          <AlertCircle style={{ display: 'inline', width: 14, height: 14, marginRight: '0.375rem' }} />
           {error}
         </div>
       )}
 
-      {/* Results */}
       {result && (
         <div>
-          {/* Developer summary */}
-          <div className="mb-6 rounded-lg border border-border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-5 w-5 text-[var(--primary)] shrink-0" />
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {result.developerSummary}
-              </p>
+          <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
+              <Sparkles style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px' }} />
+              <p style={{ fontSize: '0.8125rem', color: '#8B92A3', margin: 0 }}>{result.developerSummary}</p>
             </div>
           </div>
 
-          {/* Recommendations */}
-          <div className="space-y-4">
-            {(result.recommendations ?? []).map((rec, i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="h-4 w-4 text-[var(--primary)] shrink-0" />
-                      <a
-                        href={rec.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold hover:text-[var(--primary)] transition-colors truncate"
-                      >
-                        {rec.title}
-                      </a>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full glass px-2.5 py-0.5 text-xs font-medium">
-                        {rec.fitSignals.difficulty}
-                      </span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        rec.fitSignals.communityHealth === 'high'
-                          ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                          : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                      }`}>
-                        {rec.fitSignals.communityHealth} health
-                      </span>
-                      <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium border border-white/[0.08]">
-                        {(rec.score * 100).toFixed(0)}% match
-                      </span>
-                    </div>
+          {sections.map(({ key, title, subtitle, type }) => {
+            const items = result[key] as ScoredItem[] | undefined;
+            return (
+              <div key={key} style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.875rem', color: '#F2F4F8' }}>{title}</span>
+                    <span style={{ fontSize: '0.6875rem', color: '#8B92A3', marginLeft: '0.5rem' }}>{subtitle}</span>
                   </div>
+                  <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>{items?.length ?? 0} results</span>
                 </div>
 
-                {/* Reasons */}
-                <ul className="mt-3 space-y-1">
-                  {rec.reasons.map((reason, j) => (
-                    <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-500" />
-                      {reason}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Skill tags */}
-                {rec.fitSignals.skillOverlap.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {rec.fitSignals.skillOverlap.map((skill) => (
-                      <span key={skill} className="rounded-md border border-border px-2 py-0.5 text-xs">
-                        {skill}
-                      </span>
+                {!items || items.length === 0 ? (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem' }}>
+                    <p style={{ fontSize: '0.8125rem', color: '#8B92A3', margin: 0 }}>
+                      {type === 'trending' && 'Nothing trending in your area right now.'}
+                      {type === 'gems' && 'No hidden gems found matching your profile.'}
+                      {type === 'best' && 'No matching results found.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {items.map((item, i) => (
+                      <RepoRow key={`${key}-${i}`} item={item} section={type} />
                     ))}
                   </div>
                 )}
-
-                {/* Next steps */}
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Suggested next steps
-                  </summary>
-                  <ol className="mt-2 space-y-1 pl-4 list-decimal">
-                    {rec.suggestedNextSteps.map((step, j) => (
-                      <li key={j} className="text-xs text-muted-foreground">{step}</li>
-                    ))}
-                  </ol>
-                </details>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check (API)
+        working-directory: apps/api
+        run: npx tsc --noEmit
+
+      - name: TypeScript check + lint (Web)
+        working-directory: apps/web
+        run: |
+          npx tsc --noEmit
+          npx next lint
+
+      - name: Build (Web)
+        working-directory: apps/web
+        run: npx next build
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/oprepo
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Load production secrets
+            export $(grep -v '^\s*#' .env.production | xargs)
+
+            # Build and restart
+            docker compose \
+              -f docker-compose.yml \
+              -f docker/docker-compose.prod.yml \
+              up -d --build --remove-orphans 2>&1
+
+            # Prune old images
+            docker image prune -af --filter "until=48h" 2>/dev/null || true
+
+            echo "→ Health check..."
+            sleep 5
+            curl -sf http://localhost:4000/api/v1/health > /dev/null && \
+              echo "✓ API healthy" || echo "⚠ API health check failed"

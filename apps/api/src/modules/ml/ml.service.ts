@@ -102,4 +102,24 @@ export class MlService {
       return false;
     }
   }
+
+  /**
+   * Two-stage rerank: bi-encoder scores + cross-encoder rerank.
+   * Returns scores sorted by cross-encoder relevance.
+   */
+  async rerank(
+    query: string,
+    texts: string[],
+  ): Promise<{ reranked_scores: number[]; indices: number[] }> {
+    if (texts.length === 0) return { reranked_scores: [], indices: [] };
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/rerank`, { query, texts }),
+      );
+      return { reranked_scores: data.scores, indices: data.indices };
+    } catch (error) {
+      this.logger.error('ML service rerank failed', error);
+      throw error;
+    }
+  }
 }

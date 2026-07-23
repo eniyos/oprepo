@@ -14,6 +14,15 @@ module.exports = {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
         heading: ['var(--font-heading)', 'Quicksand', 'Poppins', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        marquee: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee var(--duration, 40s) linear infinite',
+      },
     },
   },
   plugins: [],

@@ -8,6 +8,7 @@ import axios from 'axios';
 import { Repository } from '../../database/entities/repository.entity';
 import { Issue } from '../../database/entities/issue.entity';
 import { MlService } from '../ml/ml.service';
+import { QdrantService } from '../qdrant/qdrant.service';
 import { IngestionJob } from './ingestion-queue.service';
 
 @Processor('ingestion', {
@@ -28,6 +29,7 @@ export class IngestionWorker extends WorkerHost {
     @InjectRepository(Issue)
     private issueRepo: TypeOrmRepo<Issue>,
     private mlService: MlService,
+    private qdrant: QdrantService,
   ) {
     super();
     const apiBase = this.config.get('api.github.apiBase')!;
@@ -109,11 +111,30 @@ export class IngestionWorker extends WorkerHost {
         return;
       }
 
-      const { data: issues } = await this.client.get(`/repos/${fullName}/issues`, {
-        params: { state: 'open', per_page: 100 },
-      });
+      const allIssues: any[] = [];
+      let page = 1;
+      let moreResults = true;
+      
+      // Paginate issues - continue while more results are available
+      while (moreResults) {
+        const { data: issues } = await this.client.get(`/repos/${fullName}/issues`, {
+          params: { state: 'open', per_page: 100, page },
+        });
+        
+        if (!issues.length) {
+          moreResults = false;
+        } else {
+          allIssues.push(...issues);
+          // If we got fewer than max per page, no more results
+          if (issues.length < 100) {
+            moreResults = false;
+          } else {
+            page++;
+          }
+        }
+      }
 
-      const entities = issues
+      const entities = allIssues
         .filter((i: any) => !i.pull_request)
         .map((i: any) =>
           this.issueRepo.create({
@@ -145,9 +166,36 @@ export class IngestionWorker extends WorkerHost {
       const text = parts.join('\n');
       if (!text) return;
       const embedding = await this.mlService.embedText(text);
-      await this.repoRepo.update(repo.id, { embeddings: embedding as any });
+      if (!embedding || embedding.length !== 384) return;
+
+      const tier =
+        repo.stargazersCount > 5000
+          ? 'popular'
+          : repo.stargazersCount > 500
+            ? 'mid'
+            : 'niche';
+
+      await this.qdrant.upsertPoint(repo.id, embedding, {
+        fullName: repo.fullName,
+        description: repo.description,
+        topics: repo.topics,
+        domainTags: repo.domainTags,
+        primaryLanguage: repo.primaryLanguage,
+        secondaryLanguages: repo.secondaryLanguages,
+        stargazersCount: repo.stargazersCount,
+        forksCount: repo.forksCount,
+        openIssuesCount: repo.openIssuesCount,
+        communityHealthScore: repo.communityHealthScore,
+        hasContributingGuide: repo.hasContributingGuide,
+        hasCodeOfConduct: repo.hasCodeOfConduct,
+        license: repo.license,
+        homepage: repo.homepage,
+        tier,
+        trendingScore: 0,
+        lastStarSnapshot: repo.stargazersCount,
+      });
     } catch (e) {
-      this.logger.warn(`Embedding failed for ${repo.fullName}, skipping`);
+      this.logger.warn(`Embedding + Qdrant upsert failed for ${repo.fullName}, skipping`);
     }
   }
 

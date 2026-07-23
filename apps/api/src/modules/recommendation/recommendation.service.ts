@@ -6,9 +6,30 @@ import { Repository } from '../../database/entities/repository.entity';
 import { Issue } from '../../database/entities/issue.entity';
 import { Recommendation } from '../../database/entities/recommendation.entity';
 import { Feedback } from '../../database/entities/feedback.entity';
-import { MatchingEngine } from './matching-engine.service';
 import { GithubService } from '../github/github.service';
 import { MlService } from '../ml/ml.service';
+import { QdrantService } from '../qdrant/qdrant.service';
+
+interface TieredRecommendations {
+  bestMatches: ScoredItem[];
+  trending: ScoredItem[];
+  hiddenGems: ScoredItem[];
+}
+
+export interface ScoredItem {
+  repoId?: string;
+  issueId?: string;
+  title: string;
+  url: string;
+  score: number;
+  tier: string;
+  starCount: number;
+  trendingScore: number | null;
+  matchReason: string;
+  healthScore: number;
+  suggestedNextSteps: string[];
+  reasons: string[];
+}
 
 @Injectable()
 export class RecommendationService {
@@ -25,9 +46,9 @@ export class RecommendationService {
     private recRepo: TypeOrmRepo<Recommendation>,
     @InjectRepository(Feedback)
     private feedbackRepo: TypeOrmRepo<Feedback>,
-    private matchingEngine: MatchingEngine,
     private githubService: GithubService,
     private mlService: MlService,
+    private qdrant: QdrantService,
   ) {}
 
   async recommend(input: {
@@ -39,172 +60,258 @@ export class RecommendationService {
       maxResults?: number;
     };
   }) {
-    const maxResults = input.context?.maxResults || 6;
     const focus = input.context?.focus || 'repos';
+    const maxResults = input.context?.maxResults || 10;
 
     // 1. Resolve developer
-    let developer: Developer | null = null;
-    if (input.developerId) {
-      developer = await this.developerRepo.findOneBy({ id: input.developerId });
-    }
-    if (!developer && input.githubUsername) {
-      const profile = await this.githubService.fetchDeveloperProfile(input.githubUsername);
-
-      // Check if developer already exists by username (upsert)
-      const existing = await this.developerRepo.findOneBy({
-        githubUsername: profile.githubUsername,
-      });
-
-      if (existing) {
-        // Update existing
-        existing.bio = profile.bio;
-        existing.location = profile.location;
-        existing.avatarUrl = profile.avatarUrl;
-        existing.skills = profile.skills as any;
-        existing.interests = profile.interests;
-        existing.goals = profile.goals;
-        existing.constraints = profile.constraints;
-        developer = await this.developerRepo.save(existing);
-      } else {
-        developer = await this.developerRepo.save(
-          this.developerRepo.create({
-            githubUsername: profile.githubUsername,
-            bio: profile.bio,
-            location: profile.location,
-            avatarUrl: profile.avatarUrl,
-            skills: profile.skills as any,
-            interests: profile.interests,
-            goals: profile.goals,
-            constraints: profile.constraints,
-          }),
-        );
-      }
-    }
-
+    const developer = await this.resolveDeveloper(input.developerId, input.githubUsername);
     if (!developer) {
       return {
         developerSummary: 'New developer — profile will be built as you use the platform.',
-        recommendations: [],
+        bestMatches: [],
+        trending: [],
+        hiddenGems: [],
       };
     }
 
-    // 2. Build developer summary
     const devSummary = this.buildSummary(developer);
 
-    // 3. Find candidates
-    const candidates = focus === 'issues'
-      ? await this.findIssueCandidates(developer)
-      : await this.findRepoCandidates(developer);
-
-    if (candidates.length === 0) {
+    // 2. Embed developer
+    const devText = this.mlService.buildDeveloperText(developer);
+    let devEmbedding: number[];
+    try {
+      devEmbedding = await this.mlService.embedText(devText);
+    } catch {
       return {
         developerSummary: devSummary,
-        recommendations: [],
+        bestMatches: [],
+        trending: [],
+        hiddenGems: [],
       };
     }
 
-    // 4. Score — try hybrid (ML + rules), fall back to pure rules
-    let scored = await this.matchingEngine.scoreHybrid(
-      developer, candidates, focus,
-      async (dev, repos) => this.computeMlSimilarities(dev, repos),
-    );
+    // 3. Tiered retrieval from Qdrant
+    const popular = await this.safeSearch(devEmbedding, 'popular', 20);
+    const mid = await this.safeSearch(devEmbedding, 'mid', 20);
+    const niche = await this.safeSearch(devEmbedding, 'niche', 30);
 
-    // If hybrid produced all zeros (ML down), fall back
-    if (!scored.length || scored.every((s) => s.score === 0)) {
-      scored = this.matchingEngine.score(developer, candidates, focus);
+    // 4. Build repo text map for cross-encoder reranking
+    const allByTier: Record<string, { id: string; score: number; payload: any }[]> = {
+      popular, mid, niche,
+    };
+
+    // 5. Cross-encoder rerank each tier independently
+    const reranked: Record<string, ScoredItem[]> = {};
+    for (const [tier, points] of Object.entries(allByTier)) {
+      const texts = points.map((p) => this.buildTextFromPayload(p.payload));
+      const ids = points.map((p) => p.id);
+
+      let ceScores: number[] | null = null;
+      try {
+        const result = await this.mlService.rerank(devText, texts);
+        // result.reranked_scores are raw cross-encoder scores
+        // Normalize to [0, 1] within this tier batch
+        const rawScores: number[] = new Array(ids.length).fill(0);
+        for (let i = 0; i < result.indices.length; i++) {
+          rawScores[result.indices[i]] = result.reranked_scores[i];
+        }
+        // Min-max normalize to [0, 1]
+        const min = Math.min(...rawScores);
+        const max = Math.max(...rawScores);
+        if (max - min > 0.001) {
+          ceScores = rawScores.map(s => (s - min) / (max - min));
+        } else {
+          ceScores = rawScores.map(() => 0.5);
+        }
+      } catch (e) {
+        this.logger.warn(`Rerank failed for ${tier} tier, using bi-encoder scores`, e);
+      }
+
+      const items: ScoredItem[] = points.map((p, i) => {
+        const biScore = p.score;
+        const rawCeScore = ceScores?.[i] ?? biScore;
+        // Cross-encoder scores can be strict; floor at 60% of bi-encoder score
+        // so retrieval signal is never fully suppressed by reranking
+        const ceScore = Math.max(rawCeScore, biScore * 0.6);
+        const combined = tier === 'niche'
+          ? biScore * 0.3 + ceScore * 0.7
+          : biScore * 0.4 + ceScore * 0.6;
+        const stars = p.payload.stargazersCount || 0;
+        const health = p.payload.communityHealthScore || 0;
+        const trendingScore = p.payload.trendingScore || 0;
+        const lang = p.payload.primaryLanguage || '';
+        const domains = p.payload.domainTags || [];
+
+        return {
+          repoId: p.id,
+          title: p.payload.fullName || 'Unknown',
+          url: `https://github.com/${p.payload.fullName || ''}`,
+          score: Math.max(0, Math.min(1, combined)),
+          tier,
+          starCount: stars,
+          trendingScore,
+          healthScore: health,
+          matchReason: this.buildMatchReason(lang, domains, devText),
+          suggestedNextSteps: [
+            'Read CONTRIBUTING.md and setup docs.',
+            'Start with a small docs or test improvement to get familiar.',
+            'Join the community: check for Discord/Slack links in the README.',
+          ],
+          reasons: [
+            `${stars > 0 ? `${stars.toLocaleString()} stars ` : ''}` +
+            `• ${health > 0.7 ? 'Strong' : 'Good'} community health`,
+          ],
+        };
+      });
+
+      // Sort by combined score
+      items.sort((a, b) => b.score - a.score);
+      reranked[tier] = items;
     }
 
-    // 5. Format top results
-    const topResults = scored.slice(0, maxResults);
+    // 6. Assemble three-section response
+    const bestMatches = [
+      ...reranked.popular.slice(0, 3),
+      ...reranked.mid.slice(0, 3),
+    ].slice(0, maxResults);
 
-    // 6. Persist recommendations
-    const recommendations = topResults.map((result) =>
-      this.recRepo.create({
-        developerId: developer!.id,
-        ...(focus === 'issues'
-          ? { issueId: result.issueId, repositoryId: result.issueRepositoryId }
-          : { repositoryId: result.repoId }),
-        matchScore: result.score,
-        matchReasons: result.reasons,
-        fitSignals: result.fitSignals as any,
-        suggestedSteps: result.suggestedNextSteps,
-        type: focus === 'issues' ? 'issue' : 'repo',
-      }),
-    );
+    // Trending: niche with trendingScore > threshold
+    const trending = reranked.niche
+      .filter((r) => r.trendingScore && r.trendingScore > 0.1)
+      .slice(0, 4);
 
-    if (recommendations.length > 0) {
-      await this.recRepo.save(recommendations, { chunk: 50 });
-    }
+    // Hidden gems: niche, NOT trending, highest score
+    const trendingIds = new Set(trending.map((r) => r.repoId));
+    const hiddenGems = reranked.niche
+      .filter((r) => !trendingIds.has(r.repoId))
+      .slice(0, 4);
+
+    // 7. Persist recommendations
+    await this.persistRecommendations(developer.id, [...bestMatches, ...trending, ...hiddenGems], 'repo');
 
     return {
       developerSummary: devSummary,
-      recommendations: topResults,
+      bestMatches,
+      trending,
+      hiddenGems,
     };
   }
 
-  /**
-   * Build developer embedding, embed repo texts, then compute cosine similarities.
-   * Returns a scores array parallel to `repos` or empty array on failure.
-   */
-  private async computeMlSimilarities(developer: any, repos: any[]): Promise<number[]> {
-    if (!repos.length) return [];
-
+  private async safeSearch(
+    vector: number[],
+    tier: 'popular' | 'mid' | 'niche',
+    limit: number,
+  ) {
     try {
-      // 1. Embed developer
-      const devText = this.mlService.buildDeveloperText(developer);
-      if (!devText) return [];
-      const devEmbedding = await this.mlService.embedText(devText);
-
-      // 2. Embed repos — prefer stored embeddings, fall back to on-the-fly
-      const repoEmbeddings: (number[] | null)[] = new Array(repos.length).fill(null);
-      const needEmbed: { repo: any; index: number }[] = [];
-
-      for (let i = 0; i < repos.length; i++) {
-        const repo = repos[i];
-        if (repo.embeddings?.length === 384) {
-          repoEmbeddings[i] = repo.embeddings;
-        } else {
-          needEmbed.push({ repo, index: i });
-        }
-      }
-
-      // Embed any repos that don't have stored vectors
-      if (needEmbed.length > 0) {
-        const texts = needEmbed.map(({ repo }) => this.mlService.buildRepoText(repo));
-        const embeddings = await this.mlService.embedBatch(texts);
-        for (let j = 0; j < needEmbed.length; j++) {
-          repoEmbeddings[needEmbed[j].index] = embeddings[j] ?? new Array(384).fill(0);
-        }
-      }
-
-      // Separate repos with and without embeddings
-      const withEmbed: { embedding: number[]; index: number }[] = [];
-      for (let i = 0; i < repoEmbeddings.length; i++) {
-        const emb = repoEmbeddings[i];
-        if (emb) {
-          withEmbed.push({ embedding: emb, index: i });
-        }
-      }
-
-      if (!withEmbed.length) return [];
-
-      // Compute similarities for repos that have embeddings
-      const batchScores = await this.mlService.computeSimilarities(
-        devEmbedding,
-        withEmbed.map((w) => w.embedding),
-      );
-
-      // Reconstruct full-length scores array (-1 for repos without embeddings)
-      const scores: number[] = new Array(repos.length).fill(-1);
-      for (let k = 0; k < withEmbed.length; k++) {
-        scores[withEmbed[k].index] = batchScores[k];
-      }
-
-      return scores;
+      return await this.qdrant.searchByTier(vector, tier, undefined, limit);
     } catch (e) {
-      this.logger.warn('computeMlSimilarities failed, rule-based fallback', e);
+      this.logger.warn(`Qdrant search for ${tier} failed`, e);
       return [];
     }
+  }
+
+  private buildTextFromPayload(p: any): string {
+    const parts: string[] = [];
+    if (p.description) parts.push(p.description);
+    if (p.topics?.length) parts.push(`Topics: ${(p.topics as string[]).join(', ')}`);
+    if (p.primaryLanguage) parts.push(`Language: ${p.primaryLanguage}`);
+    return parts.join('\n');
+  }
+
+  private buildMatchReason(lang: string, domains: string[], devText: string): string {
+    const devLang = devText.match(/Languages: ([\w#, ]+)/);
+    const devDom = devText.match(/Domains: ([\w#, /]+)/);
+    const parts: string[] = [];
+    if (lang && devLang?.[1]?.toLowerCase().includes(lang.toLowerCase())) {
+      parts.push(`matches your ${lang} experience`);
+    }
+    if (domains.length > 0 && devDom?.[1]) {
+      const overlap = domains.filter((d) =>
+        devDom[1].toLowerCase().includes(d.toLowerCase()),
+      );
+      if (overlap.length > 0) parts.push(`aligns with ${overlap[0]}`);
+    }
+    return parts.length > 0 ? parts.join(' • ') : 'semantically similar to your profile';
+  }
+
+  private async resolveDeveloper(
+    developerId?: string,
+    githubUsername?: string,
+  ): Promise<Developer | null> {
+    let developer: Developer | null = null;
+    if (developerId) {
+      developer = await this.developerRepo.findOneBy({ id: developerId });
+    }
+    if (!developer && githubUsername) {
+      // Check DB first before hitting GitHub API
+      developer = await this.developerRepo.findOneBy({
+        githubUsername,
+      });
+
+      if (!developer) {
+        try {
+          const profile = await this.githubService.fetchDeveloperProfile(githubUsername);
+          developer = await this.developerRepo.save(
+            this.developerRepo.create({
+              githubUsername: profile.githubUsername,
+              bio: profile.bio,
+              location: profile.location,
+              avatarUrl: profile.avatarUrl,
+              skills: profile.skills as any,
+              interests: profile.interests,
+              goals: profile.goals,
+              constraints: profile.constraints,
+            }),
+          );
+        } catch (e) {
+          this.logger.warn(`Could not fetch GitHub profile for ${githubUsername}, using cached data`, e);
+          return developer; // null
+        }
+      } else {
+        // Update existing record with latest GitHub data (best-effort)
+        try {
+          const profile = await this.githubService.fetchDeveloperProfile(githubUsername);
+          developer.bio = profile.bio;
+          developer.location = profile.location;
+          developer.avatarUrl = profile.avatarUrl;
+          developer.skills = profile.skills as any;
+          developer.interests = profile.interests;
+          developer.goals = profile.goals;
+          developer.constraints = profile.constraints;
+          developer = await this.developerRepo.save(developer);
+        } catch {
+          // Non-fatal, existing data is fine
+          this.logger.warn(`Could not refresh GitHub profile for ${githubUsername}, using cached data`);
+        }
+      }
+    }
+    return developer;
+  }
+
+  private async persistRecommendations(
+    developerId: string,
+    items: ScoredItem[],
+    type: 'repo' | 'issue',
+  ) {
+    if (!items.length) return;
+    const recommendations = items.map((item) =>
+      this.recRepo.create({
+        developerId,
+        repositoryId: item.repoId,
+        matchScore: item.score,
+        matchReasons: item.reasons,
+        fitSignals: {
+          skillOverlap: [],
+          domainOverlap: [],
+          difficulty: 'intermediate',
+          communityHealth: item.healthScore > 0.7 ? 'high' : 'medium',
+          goalAlignment: [],
+        },
+        suggestedSteps: item.suggestedNextSteps,
+        type,
+      }),
+    );
+    await this.recRepo.save(recommendations, { chunk: 50 });
   }
 
   async recordFeedback(input: {
@@ -245,48 +352,6 @@ export class RecommendationService {
       take: limit,
       relations: ['repository', 'issue'],
     });
-  }
-
-  private async findRepoCandidates(developer: Developer) {
-    const recommendedIds = await this.recRepo.find({
-      where: { developerId: developer.id, type: 'repo' },
-      select: ['repositoryId'],
-    });
-    const excludeIds = recommendedIds.map((r) => r.repositoryId).filter(Boolean) as string[];
-
-    const query = this.repoRepo
-      .createQueryBuilder('r')
-      .where('r.stargazersCount > 10')
-      .andWhere('r.communityHealthScore >= 0')
-      .orderBy('r.stargazersCount', 'DESC')
-      .take(200);
-
-    if (excludeIds.length > 0) {
-      query.andWhere('r.id NOT IN (:...excludeIds)', { excludeIds });
-    }
-
-    return query.getMany();
-  }
-
-  private async findIssueCandidates(developer: Developer) {
-    const recommendedIds = await this.recRepo.find({
-      where: { developerId: developer.id, type: 'issue' },
-      select: ['issueId'],
-    });
-    const excludeIds = recommendedIds.map((r) => r.issueId).filter(Boolean) as string[];
-
-    const query = this.issueRepo
-      .createQueryBuilder('i')
-      .leftJoinAndSelect('i.repository', 'r')
-      .where('i.state = :state', { state: 'open' })
-      .orderBy('i.commentCount', 'ASC')
-      .take(200);
-
-    if (excludeIds.length > 0) {
-      query.andWhere('i.id NOT IN (:...excludeIds)', { excludeIds });
-    }
-
-    return query.getMany();
   }
 
   private buildSummary(dev: Developer): string {

@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ArrowRight, Github, GitFork, Sparkles, Star, BarChart3, Shield, Search, Users, GitPullRequest, Zap, Layers, TrendingUp, Database, Code2, GitCommit, Activity, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Github, GitFork, Sparkles, Star, BarChart3, Shield, Search, Users, GitPullRequest, Zap, Layers, TrendingUp } from 'lucide-react';
 
 function Fade({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
@@ -16,37 +15,6 @@ function SectionHeader({ title, sub }: { title: string; sub: string }) {
     <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
       <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.25rem)', fontWeight: 300, color: '#F2F4F8', letterSpacing: '0.01em', margin: 0 }}>{title}</h2>
       <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: '#8B92A3', maxWidth: '28rem', marginLeft: 'auto', marginRight: 'auto' }}>{sub}</p>
-    </div>
-  );
-}
-
-function StatCounter({ value, label, icon: Icon }: { value: number; label: string; icon: any }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const duration = 2000;
-    const step = Math.max(1, Math.floor(value / 60));
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= value) { setCount(value); clearInterval(timer); }
-      else { setCount(start); }
-    }, duration / 60);
-    return () => clearInterval(timer);
-  }, [value]);
-
-  let display: string;
-  if (value >= 1000000) display = `${(count / 1000000).toFixed(count >= value ? 0 : 1)}M`;
-  else if (value >= 1000) display = `${(count / 1000).toFixed(count >= value ? 0 : 1)}K`;
-  else display = count.toString();
-
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <Icon style={{ width: 18, height: 18, color: '#7C9CF0', margin: '0 auto 0.5rem' }} />
-      <div style={{ fontSize: '1.5rem', fontWeight: 300, color: '#F2F4F8', letterSpacing: '0.02em' }}>
-        {display}
-      </div>
-      <div style={{ fontSize: '0.6875rem', color: '#8B92A3', marginTop: '0.25rem', letterSpacing: '0.01em' }}>{label}</div>
     </div>
   );
 }
@@ -66,22 +34,191 @@ const FEATURES = [
   { icon: Star, title: 'Explainable Results', desc: 'Every recommendation comes with clear reasons and suggested next steps.' },
 ];
 
-const LIVE_STATS = [
-  { value: 54, label: 'Repositories indexed', icon: Database },
-  { value: 2154, label: 'Issues analyzed', icon: GitCommit },
-  { value: 9, label: 'Languages supported', icon: Code2 },
-  { value: 384, label: 'Embedding dimensions', icon: Layers },
-  { value: 4413683, label: 'Total stars across repos', icon: Star },
-  { value: 36, label: 'Recommendations made', icon: Activity },
-  { value: 26, label: 'Domain tags', icon: BarChart3 },
-  { value: 10, label: 'Developers onboarded', icon: Users },
+const CARD_DATA = [
+  {
+    icon: Search,
+    title: 'Profile Analysis',
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.375rem' }}>
+          {['TypeScript', 'JavaScript', 'CSS'].map(l => (
+            <span key={l} style={{ padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.25rem', fontSize: '0.6875rem', color: '#8B92A3' }}>{l}</span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.375rem' }}>
+          {['frontend', 'react', 'ui'].map(d => (
+            <span key={d} style={{ padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.25rem', fontSize: '0.6875rem', color: '#7C9CF0' }}>{d}</span>
+          ))}
+        </div>
+        <div style={{ marginTop: '0.5rem', height: '4px', background: 'rgba(124,156,240,0.1)', borderRadius: '2px' }}>
+          <div style={{ width: '73%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.6 }} />
+        </div>
+        <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Match confidence: 73%</span>
+      </div>
+    ),
+  },
+  {
+    icon: TrendingUp,
+    title: 'Top Recommendations',
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        {[['vercel/next.js', '85%'], ['react/react', '80%'], ['microsoft/vscode', '78%']].map(([name, score]) => (
+          <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <GitFork style={{ width: 12, height: 12, color: '#7C9CF0' }} />
+              <span style={{ fontSize: '0.75rem', color: '#F2F4F8' }}>{name}</span>
+            </div>
+            <span style={{ fontSize: '0.6875rem', color: '#7C9CF0' }}>{score}</span>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    icon: Layers,
+    title: 'Skill Match',
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.375rem' }}>
+            <span style={{ color: '#8B92A3' }}>Language overlap</span>
+            <span style={{ color: '#F2F4F8' }}>2/3</span>
+          </div>
+          <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ width: '66%', height: '100%', background: '#7C9CF0', borderRadius: '4px', opacity: 0.7 }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.375rem' }}>
+            <span style={{ color: '#8B92A3' }}>Domain affinity</span>
+            <span style={{ color: '#F2F4F8' }}>3/3</span>
+          </div>
+          <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '100%', background: '#7C9CF0', borderRadius: '4px', opacity: 0.7 }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.375rem' }}>
+            <span style={{ color: '#8B92A3' }}>ML similarity</span>
+            <span style={{ color: '#F2F4F8' }}>0.89</span>
+          </div>
+          <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ width: '89%', height: '100%', background: 'linear-gradient(90deg, #7C9CF0, #A8C0FF)', borderRadius: '4px', opacity: 0.8 }} />
+          </div>
+        </div>
+        <div style={{ marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'center', gap: '0.375rem' }}>
+          <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Overall fit</span>
+          <span style={{ fontSize: '0.75rem', color: '#7C9CF0', fontWeight: 500 }}>85%</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    icon: Shield,
+    title: 'Community Health',
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+              <span style={{ color: '#8B92A3' }}>Response time</span>
+              <span style={{ color: '#F2F4F8' }}>2h</span>
+            </div>
+            <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '0.25rem', overflow: 'hidden' }}>
+              <div style={{ width: '92%', height: '100%', background: '#4ade80', borderRadius: '2px', opacity: 0.7 }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#7C9CF0' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+              <span style={{ color: '#8B92A3' }}>Contributing guide</span>
+              <span style={{ color: '#F2F4F8' }}>Yes</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#7C9CF0' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+              <span style={{ color: '#8B92A3' }}>Code of conduct</span>
+              <span style={{ color: '#F2F4F8' }}>Yes</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'center', gap: '0.375rem' }}>
+          <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Health score</span>
+          <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 500 }}>92%</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    icon: Zap,
+    title: 'Difficulty Calibration',
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Your level</span>
+          <span style={{ fontSize: '0.75rem', padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.25rem', color: '#7C9CF0' }}>Intermediate</span>
+        </div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+            <span style={{ color: '#8B92A3' }}>Beginner</span>
+            <span style={{ color: '#8B92A3' }}>30%</span>
+          </div>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '30%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.5 }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+            <span style={{ color: '#F2F4F8' }}>Intermediate</span>
+            <span style={{ color: '#7C9CF0' }}>45%</span>
+          </div>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '45%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.8 }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+            <span style={{ color: '#8B92A3' }}>Advanced</span>
+            <span style={{ color: '#8B92A3' }}>25%</span>
+          </div>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '25%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.5 }} />
+          </div>
+        </div>
+        <div style={{ marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'center', gap: '0.375rem' }}>
+          <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Best match</span>
+          <span style={{ fontSize: '0.75rem', color: '#7C9CF0', fontWeight: 500 }}>Intermediate</span>
+        </div>
+      </div>
+    ),
+  },
 ];
+
+function ScreenshotCard({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ minWidth: '280px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ padding: '1rem 1.25rem', background: 'rgba(124,156,240,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Icon style={{ width: 14, height: 14, color: '#7C9CF0' }} />
+          <span style={{ fontSize: '0.8125rem', color: '#F2F4F8' }}>{title}</span>
+        </div>
+      </div>
+      <div style={{ padding: '1.25rem' }}>{children}</div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-      {/* ═══ 1. HEADLINE, SUBHEAD, CTA ═══ */}
+      {/* ═══ HERO ═══ */}
       <section style={{ position: 'relative', width: '100%', minHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '7rem 1rem 3rem' }}>
           <div style={{ textAlign: 'center', maxWidth: '40rem', margin: '0 auto' }}>
@@ -124,11 +261,10 @@ export default function HomePage() {
         <style>{`@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }`}</style>
       </section>
 
-      {/* ═══ 2. EMBEDDING VISUALIZATION ═══ */}
+      {/* ═══ EMBEDDING VISUALIZATION ═══ */}
       <section style={{ padding: '6rem 1rem', maxWidth: '56rem', margin: '0 auto' }}>
         <SectionHeader title="How embeddings see your skills" sub="Your profile and every repo is mapped into a 384-dimensional vector space. We find the closest matches." />
         <div style={{ position: 'relative', height: '220px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', overflow: 'hidden' }}>
-          {/* Simulated embedding space with dot clusters */}
           <svg width="100%" height="100%" viewBox="0 0 800 220" style={{ background: 'rgba(10,10,14,0.3)' }}>
             {/* Grid lines */}
             {[0,1,2,3,4,5,6,7,8,9].map(i => (
@@ -166,18 +302,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ 3. TRUST STRIP ═══ */}
-      <section style={{ padding: '4rem 1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '2.5rem', maxWidth: '56rem', margin: '0 auto' }}>
-          {LIVE_STATS.map(s => (
-            <StatCounter key={s.label} value={s.value} label={s.label} icon={s.icon} />
-          ))}
-        </div>
-      </section>
-
       <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', maxWidth: '48rem', margin: '0 auto' }} />
 
-      {/* ═══ 4. HOW IT WORKS ═══ */}
+      {/* ═══ HOW IT WORKS ═══ */}
       <section id="how" style={{ scrollMarginTop: '80px', padding: '6rem 1rem', maxWidth: '48rem', margin: '0 auto' }}>
         <SectionHeader title="How it works" sub="Three steps from zero to your first contribution." />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
@@ -196,7 +323,7 @@ export default function HomePage() {
 
       <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', maxWidth: '48rem', margin: '0 auto' }} />
 
-      {/* ═══ 5. FEATURE / VALUE HIGHLIGHTS ═══ */}
+      {/* ═══ FEATURES ═══ */}
       <section id="features" style={{ scrollMarginTop: '80px', padding: '6rem 1rem', maxWidth: '56rem', margin: '0 auto' }}>
         <SectionHeader title="Built for developers" sub="Every feature designed to make your open-source journey smoother." />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
@@ -214,89 +341,18 @@ export default function HomePage() {
 
       <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', maxWidth: '48rem', margin: '0 auto' }} />
 
-      {/* ═══ 6. PRODUCT SCREENSHOTS ═══ */}
+      {/* ═══ SCREENSHOTS ═══ */}
       <section style={{ padding: '6rem 1rem', maxWidth: '56rem', margin: '0 auto' }}>
         <SectionHeader title="See it in action" sub="Enter a username, pick repos or issues, get instant matches." />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-          {/* Screenshot card 1 */}
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', overflow: 'hidden' }}>
-            <div style={{ padding: '1.25rem', background: 'rgba(124,156,240,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Search style={{ width: 14, height: 14, color: '#7C9CF0' }} />
-                <span style={{ fontSize: '0.8125rem', color: '#F2F4F8' }}>Profile Analysis</span>
-              </div>
+        <div className="relative w-full overflow-hidden pause-on-hover">
+          <div className="flex [--gap:1rem] [--duration:50s]">
+            {/* First scroll track */}
+            <div className="flex shrink-0 items-stretch gap-[var(--gap)] motion-safe:animate-marquee" style={{ animationDuration: '50s' }}>
+              {CARD_DATA.map((card, i) => (<ScreenshotCard key={i} {...card} />))}
             </div>
-            <div style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.375rem' }}>
-                  {['TypeScript', 'JavaScript', 'CSS'].map(l => (
-                    <span key={l} style={{ padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.25rem', fontSize: '0.6875rem', color: '#8B92A3' }}>{l}</span>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '0.375rem' }}>
-                  {['frontend', 'react', 'ui'].map(d => (
-                    <span key={d} style={{ padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.25rem', fontSize: '0.6875rem', color: '#7C9CF0' }}>{d}</span>
-                  ))}
-                </div>
-                <div style={{ marginTop: '0.5rem', height: '4px', background: 'rgba(124,156,240,0.1)', borderRadius: '2px' }}>
-                  <div style={{ width: '73%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.6 }} />
-                </div>
-                <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>Match confidence: 73%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Screenshot card 2 — recommendations list */}
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', overflow: 'hidden' }}>
-            <div style={{ padding: '1.25rem', background: 'rgba(124,156,240,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <TrendingUp style={{ width: 14, height: 14, color: '#7C9CF0' }} />
-                <span style={{ fontSize: '0.8125rem', color: '#F2F4F8' }}>Top Recommendations</span>
-              </div>
-            </div>
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-              {[['vercel/next.js', '85%'], ['react/react', '80%'], ['microsoft/vscode', '78%']].map(([name, score]) => (
-                <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <GitFork style={{ width: 12, height: 12, color: '#7C9CF0' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#F2F4F8' }}>{name}</span>
-                  </div>
-                  <span style={{ fontSize: '0.6875rem', color: '#7C9CF0' }}>{score}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Screenshot card 3 — embedding match */}
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', overflow: 'hidden' }}>
-            <div style={{ padding: '1.25rem', background: 'rgba(124,156,240,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Layers style={{ width: 14, height: 14, color: '#7C9CF0' }} />
-                <span style={{ fontSize: '0.8125rem', color: '#F2F4F8' }}>Skill Match</span>
-              </div>
-            </div>
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6875rem' }}>
-                <span style={{ color: '#8B92A3' }}>Language overlap</span>
-                <span style={{ color: '#F2F4F8' }}>2/3</span>
-              </div>
-              <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-                <div style={{ width: '66%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.6 }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6875rem' }}>
-                <span style={{ color: '#8B92A3' }}>Domain affinity</span>
-                <span style={{ color: '#F2F4F8' }}>3/3</span>
-              </div>
-              <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-                <div style={{ width: '100%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.6 }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6875rem' }}>
-                <span style={{ color: '#8B92A3' }}>ML similarity</span>
-                <span style={{ color: '#F2F4F8' }}>0.89</span>
-              </div>
-              <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-                <div style={{ width: '89%', height: '100%', background: '#7C9CF0', borderRadius: '2px', opacity: 0.6 }} />
-              </div>
+            {/* Duplicate for seamless loop */}
+            <div className="flex shrink-0 items-stretch gap-[var(--gap)] motion-safe:animate-marquee" aria-hidden style={{ animationDuration: '50s' }}>
+              {CARD_DATA.map((card, i) => (<ScreenshotCard key={`dup-${i}`} {...card} />))}
             </div>
           </div>
         </div>
@@ -307,22 +363,6 @@ export default function HomePage() {
           </a>
         </div>
       </section>
-
-      {/* ═══ 7. MINIMAL FOOTER ═══ */}
-      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-        <div style={{ maxWidth: '48rem', margin: '0 auto', padding: '3rem 1rem', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.8125rem', color: '#F2F4F8', fontWeight: 300, letterSpacing: '0.02em', margin: 0 }}>OpRepo</p>
-          <p style={{ fontSize: '0.6875rem', color: '#8B92A3', marginTop: '0.75rem', marginBottom: 0 }}>Find your next open-source contribution. &copy; {new Date().getFullYear()}</p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1rem' }}>
-            <a href="https://github.com/eniyos/oprepo" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', color: '#8B92A3', textDecoration: 'none', transition: 'color 600ms ease-out' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#F2F4F8'} onMouseLeave={e => e.currentTarget.style.color = '#8B92A3'}>GitHub</a>
-            <a href="/" style={{ fontSize: '0.6875rem', color: '#8B92A3', textDecoration: 'none', transition: 'color 600ms ease-out' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#F2F4F8'} onMouseLeave={e => e.currentTarget.style.color = '#8B92A3'}>About</a>
-            <a href="/recommend" style={{ fontSize: '0.6875rem', color: '#8B92A3', textDecoration: 'none', transition: 'color 600ms ease-out' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#F2F4F8'} onMouseLeave={e => e.currentTarget.style.color = '#8B92A3'}>Recommend</a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -1,0 +1,10 @@
+# Caddy reverse proxy — fronts the NestJS API with automatic HTTPS
+# Works with docker compose network, no manual certbot needed.
+
+api.oprepo.dev {
+    reverse_proxy api:4000
+}
+
+ml.oprepo.dev {
+    reverse_proxy ml:8000
+}

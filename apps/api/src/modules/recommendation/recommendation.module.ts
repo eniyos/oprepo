@@ -7,18 +7,19 @@ import { Recommendation } from '../../database/entities/recommendation.entity';
 import { Feedback } from '../../database/entities/feedback.entity';
 import { RecommendationController } from './recommendation.controller';
 import { RecommendationService } from './recommendation.service';
-import { MatchingEngine } from './matching-engine.service';
 import { MlModule } from '../ml/ml.module';
 import { GithubModule } from '../github/github.module';
+import { QdrantModule } from '../qdrant/qdrant.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Developer, Repository, Issue, Recommendation, Feedback]),
     MlModule,
     GithubModule,
+    QdrantModule,
   ],
   controllers: [RecommendationController],
-  providers: [RecommendationService, MatchingEngine],
+  providers: [RecommendationService],
   exports: [RecommendationService],
 })
 export class RecommendationModule {}

@@ -9,6 +9,7 @@ import { MlModule } from './modules/ml/ml.module';
 import { ApiConfig } from './config/api.config';
 import { CronModule } from './modules/cron/cron.module';
 import { SnakeNamingStrategy } from './config/snake-naming.strategy';
+import { QdrantModule } from './modules/qdrant/qdrant.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SnakeNamingStrategy } from './config/snake-naming.strategy';
     RecommendationModule,
     MlModule,
     CronModule,
+    QdrantModule,
   ],
 })
 export class AppModule {}

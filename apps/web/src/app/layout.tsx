@@ -4,6 +4,7 @@ import { Header } from '@/components/header';
 import { Inter, Poppins } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import Auralis from '@/components/ui/auralis';
+import { Footer } from '@/components/ui/auralis-footer';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const poppins = Poppins({ subsets: ['latin'], weight: ['300', '400', '500'], variable: '--font-heading' });
@@ -47,9 +48,10 @@ export default function RootLayout({
           className="fixed inset-0 z-0 w-full"
         />
 
-        <div className="relative z-10">
+        <div className="relative z-10 flex min-h-screen flex-col">
           <Header />
-          {children}
+          <main className="flex-1">{children}</main>
+          <Footer />
         </div>
       </body>
     </html>

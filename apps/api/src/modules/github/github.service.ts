@@ -47,12 +47,12 @@ export class GithubService {
     }
   }
 
-  private async fetchUserRepos(username: string, page = 1, perPage = 50): Promise<any[]> {
+  private async fetchUserRepos(username: string, page = 1, perPage = 50, maxPages = 10): Promise<any[]> {
     const { data } = await this.client.get(`/users/${username}/repos`, {
       params: { page, per_page: perPage, sort: 'updated', direction: 'desc' },
     });
-    if (data.length === perPage) {
-      return data.concat(await this.fetchUserRepos(username, page + 1, perPage));
+    if (data.length === perPage && page < maxPages) {
+      return data.concat(await this.fetchUserRepos(username, page + 1, perPage, maxPages));
     }
     return data;
   }

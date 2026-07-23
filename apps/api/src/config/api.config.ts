@@ -12,6 +12,10 @@ export const ApiConfig = registerAs('api', () => ({
   ml: {
     serviceUrl: process.env.ML_SERVICE_URL || 'http://localhost:8000',
   },
+  qdrant: {
+    url: process.env.QDRANT_URL || 'http://localhost:6333',
+    collectionName: process.env.QDRANT_COLLECTION || 'repositories',
+  },
   github: {
     token: process.env.GITHUB_TOKEN,
     apiBase: 'https://api.github.com',

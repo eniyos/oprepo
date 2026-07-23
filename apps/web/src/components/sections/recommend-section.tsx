@@ -1,20 +1,93 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, Loader2, Sparkles, GitBranch, AlertCircle, CheckCircle2, Bug, BookOpen, Code2, ExternalLink, Zap, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Loader2, Sparkles, GitBranch, AlertCircle, TrendingUp, Star, Zap, ExternalLink } from 'lucide-react';
 
-interface Rec { title: string; url: string; score: number; reasons: string[]; fitSignals: { skillOverlap: string[]; domainOverlap: string[]; difficulty: string; communityHealth: string; }; suggestedNextSteps: string[]; }
-interface Res { developerSummary: string; recommendations: Rec[]; }
+interface ScoredItem {
+  repoId?: string;
+  issueId?: string;
+  title: string;
+  url: string;
+  score: number;
+  tier: string;
+  starCount: number;
+  trendingScore: number | null;
+  matchReason: string;
+  healthScore: number;
+  suggestedNextSteps: string[];
+  reasons: string[];
+}
 
-const diffIcons: Record<string, LucideIcon> = { beginner: BookOpen, intermediate: Code2, advanced: Zap };
-const diffColors: Record<string, string> = { beginner: 'rgba(74,222,128,0.6)', intermediate: 'rgba(250,204,21,0.6)', advanced: 'rgba(248,113,113,0.6)' };
+interface TieredResponse {
+  developerSummary: string;
+  bestMatches: ScoredItem[];
+  trending: ScoredItem[];
+  hiddenGems: ScoredItem[];
+}
+
+function RepoRow({ item, section }: { item: ScoredItem; section: 'best' | 'trending' | 'gems' }) {
+  return (
+    <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', transition: 'border-color 600ms ease-out' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.24)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+        <GitBranch style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px', flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: '0.8125rem', color: '#F2F4F8', textDecoration: 'none', transition: 'color 600ms ease-out', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#7C9CF0'}
+              onMouseLeave={e => e.currentTarget.style.color = '#F2F4F8'}>
+              {item.title}
+            </a>
+            <ExternalLink style={{ width: 11, height: 11, color: '#8B92A3', flexShrink: 0 }} />
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+            {/* Score badge — always shown */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#7C9CF0' }}>
+              <Zap style={{ width: 10, height: 10 }} />
+              {(item.score * 100).toFixed(0)}%
+            </span>
+
+            {/* Section-specific metadata */}
+            {section === 'trending' && item.trendingScore != null && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
+                <TrendingUp style={{ width: 10, height: 10 }} />
+                +{(item.trendingScore * 100).toFixed(0)}% this week
+              </span>
+            )}
+
+            {section === 'gems' && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
+                <Star style={{ width: 10, height: 10 }} />
+                {item.healthScore > 0.7 ? '92% health' : `${(item.healthScore * 100).toFixed(0)}% health`}
+              </span>
+            )}
+
+            {section !== 'gems' && (
+              <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>
+                {item.starCount >= 1000 ? `${(item.starCount / 1000).toFixed(1)}K` : item.starCount} stars
+              </span>
+            )}
+          </div>
+
+          {/* Match reason */}
+          <p style={{ marginTop: '0.375rem', fontSize: '0.75rem', color: '#8B92A3', lineHeight: 1.4, marginBottom: 0 }}>
+            {item.matchReason}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function RecommendSection() {
   const [username, setUsername] = useState('');
   const [focus, setFocus] = useState<'repos' | 'issues'>('repos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Res | null>(null);
+  const [result, setResult] = useState<TieredResponse | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -26,7 +99,7 @@ export function RecommendSection() {
       const t = setTimeout(() => ctrl.abort(), 15000);
       const res = await fetch(`${apiUrl}/api/v1/recommend`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ githubUsername: username.trim(), context: { focus, maxResults: 6 } }),
+        body: JSON.stringify({ githubUsername: username.trim(), context: { focus, maxResults: 10 } }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
@@ -36,6 +109,12 @@ export function RecommendSection() {
       setError(err instanceof DOMException && err.name === 'AbortError' ? 'Request timed out.' : 'Failed to get recommendations');
     } finally { setLoading(false); }
   };
+
+  const sections: { key: keyof TieredResponse; title: string; subtitle: string; type: 'best' | 'trending' | 'gems' }[] = [
+    { key: 'bestMatches', title: 'Best matches', subtitle: 'Top recommendations across popular and mid-range repos', type: 'best' },
+    { key: 'trending', title: 'Trending', subtitle: 'Rising projects in your domain', type: 'trending' },
+    { key: 'hiddenGems', title: 'Hidden gems', subtitle: 'Under-the-radar repos worth discovering', type: 'gems' },
+  ];
 
   return (
     <section id="recommend" style={{ scrollMarginTop: '80px', maxWidth: '48rem', margin: '0 auto', padding: '6rem 1rem' }}>
@@ -75,6 +154,7 @@ export function RecommendSection() {
 
       {result && (
         <div>
+          {/* Developer summary */}
           <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
               <Sparkles style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px' }} />
@@ -82,67 +162,37 @@ export function RecommendSection() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#F2F4F8' }}>{focus === 'repos' ? 'Repos' : 'Issues'}</span>
-            <span style={{ fontSize: '0.75rem', color: '#8B92A3' }}>{result.recommendations.length} result{result.recommendations.length !== 1 ? 's' : ''}</span>
-          </div>
-
-          {result.recommendations.length === 0 ? (
-            <div style={{ padding: '3rem 1rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem' }}>
-              <p style={{ fontSize: '0.8125rem', color: '#8B92A3' }}>No matching results found.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-              {result.recommendations.map((r, i) => {
-                const DIcon = diffIcons[r.fitSignals.difficulty] || BookOpen;
-                return (
-                  <div key={i} style={{ padding: '1rem 1.25rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', transition: 'border-color 600ms ease-out' }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.24)'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}>
-                    
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                      {focus === 'issues' ? <Bug style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px' }} /> : <GitBranch style={{ width: 14, height: 14, color: '#7C9CF0', marginTop: '2px' }} />}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <a href={r.url} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: '0.8125rem', color: '#F2F4F8', textDecoration: 'none', transition: 'color 600ms ease-out', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#7C9CF0'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#F2F4F8'}>
-                            {r.title}
-                          </a>
-                          <ExternalLink style={{ width: 11, height: 11, color: '#8B92A3', flexShrink: 0 }} />
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
-                            <DIcon style={{ width: 10, height: 10, color: diffColors[r.fitSignals.difficulty] || '#8B92A3' }} />
-                            {r.fitSignals.difficulty}
-                          </span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#8B92A3' }}>
-                            <CheckCircle2 style={{ width: 10, height: 10, color: '#8B92A3' }} />
-                            {r.fitSignals.communityHealth}
-                          </span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.125rem 0.5rem', border: '1px solid #7C9CF0', borderRadius: '0.375rem', fontSize: '0.6875rem', color: '#7C9CF0' }}>
-                            <Zap style={{ width: 10, height: 10 }} />
-                            {(r.score * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        {r.reasons.length > 0 && (
-                          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                            {r.reasons.slice(0, 2).map((reason, j) => (
-                              <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.375rem', fontSize: '0.75rem', color: '#8B92A3' }}>
-                                <CheckCircle2 style={{ width: 10, height: 10, color: '#7C9CF0', marginTop: '2px' }} />
-                                <span>{reason}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+          {/* Three sections */}
+          {sections.map(({ key, title, subtitle, type }) => {
+            const items = result[key] as ScoredItem[] | undefined;
+            return (
+              <div key={key} style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.875rem', color: '#F2F4F8' }}>{title}</span>
+                    <span style={{ fontSize: '0.6875rem', color: '#8B92A3', marginLeft: '0.5rem' }}>{subtitle}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <span style={{ fontSize: '0.6875rem', color: '#8B92A3' }}>{items?.length ?? 0} results</span>
+                </div>
+
+                {!items || items.length === 0 ? (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.375rem' }}>
+                    <p style={{ fontSize: '0.8125rem', color: '#8B92A3', margin: 0 }}>
+                      {type === 'trending' && 'Nothing trending in your area right now.'}
+                      {type === 'gems' && 'No hidden gems found matching your profile.'}
+                      {type === 'best' && 'No matching results found.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {items.map((item, i) => (
+                      <RepoRow key={`${key}-${i}`} item={item} section={type} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

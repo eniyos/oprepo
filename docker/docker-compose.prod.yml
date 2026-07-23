@@ -1,0 +1,83 @@
+# Production docker-compose overrides.
+# Usage: docker compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
+
+services:
+  # Caddy reverse proxy with auto HTTPS
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - ml
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    ports:
+      - "127.0.0.1:4000:4000"   # bind to localhost only, Caddy proxies
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ML_SERVICE_URL=http://ml:8000
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - QDRANT_URL=http://qdrant:6333
+      - CORS_ORIGIN=https://oprepo.dev
+    volumes: []
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://api.oprepo.dev
+    volumes: []
+    restart: unless-stopped
+
+  ml:
+    build:
+      context: services/ml
+      dockerfile: ../../docker/ml/Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - MODEL_NAME=all-MiniLM-L6-v2
+      - CROSS_ENCODER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+    volumes: []
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+    restart: unless-stopped
+
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"   # not exposed publicly
+    restart: unless-stopped
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+
+  qdrant:
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

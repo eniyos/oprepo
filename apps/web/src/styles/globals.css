@@ -96,6 +96,10 @@
   .input-field::placeholder {
     color: #8B92A3;
   }
+
+  .pause-on-hover:hover > * {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes fadeUp {
